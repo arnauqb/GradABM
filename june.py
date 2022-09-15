@@ -1,14 +1,38 @@
 from dis import dis
+from tkinter import W
+import torch
+import numpy as np
 import pandas as pd
+from torch.nn.utils.rnn import pad_sequence
+from sklearn.preprocessing import StandardScaler
 
 from paths import default_data_path
 from torch_june import Runner
+from model_utils import SeqData
 
 default_june_data_path = default_data_path / "June"
 default_june_config_path = default_june_data_path / "june_default.yaml"
 default_daily_deaths_filename = default_june_data_path / "deaths_by_lad.csv"
 default_mobility_data_filename = default_june_data_path / "london_mobility_data.csv"
 default_area_to_district_filename = default_june_data_path / "area_district.csv"
+
+
+def get_attribute(base, path):
+    paths = path.split(".")
+    for p in paths:
+        base = getattr(base, p)
+    return base
+
+
+def set_attribute(base, path, target):
+    paths = path.split(".")
+    _base = base
+    for p in paths[:-1]:
+        _base = getattr(_base, p)
+    if type(_base) == dict:
+        _base[paths[-1]] = target
+    else:
+        setattr(_base, paths[-1], target)
 
 
 class June:
@@ -18,6 +42,40 @@ class June:
 
     def __init__(self, params, device):
         self.runner = Runner.from_file(default_june_config_path)
+
+    @property
+    def device(self):
+        return self.runner.device
+
+    def _assign_district_to_agents(self, district_data):
+        district_ids = district_data.area_to_district.loc[
+            self.runner.data["agent"].area, "id"
+        ].values
+        district_nums = torch.arange(0, np.unique(district_ids).shape[0])
+        ret_idcs = np.searchsorted(np.sort(np.unique(district_ids)), district_ids)
+        ret = district_nums[ret_idcs]
+        self.runner.data["agent"].district = ret
+
+    def _set_param_values(self, param_values):
+        for i, param_name in enumerate(["infection_networks.networks.pub.log_beta"]):
+            set_attribute(self.runner.model, param_name, param_values.flatten()[i])
+
+    def _get_deaths_per_week(self):
+        deaths_by_district_timestep = self.runner.data["results"][
+            "daily_deaths_by_district"
+        ].transpose(0,1)
+        deaths_cumsum = deaths_by_district_timestep.cumsum(1)
+        mask = torch.zeros(deaths_cumsum.shape[1], dtype=torch.long)
+        mask[::7] = 1
+        mask = mask.to(torch.bool)
+        ret = deaths_cumsum[:, mask]
+        return ret
+
+    def step(self, param_values):
+        self._set_param_values(param_values)
+        results, _ = self.runner()
+        predictions = self._get_deaths_per_week()
+        return predictions
 
 
 class DistrictData:
@@ -126,7 +184,7 @@ class DistrictData:
             week_1: first week
             week_2: last week (included)
         """
-        features = (
+        features_mobility = (
             self.weekly_mobility_data.loc[
                 self.weekly_mobility_data.district_id == district
             ]
@@ -134,14 +192,18 @@ class DistrictData:
             .iloc[week_1:week_2]
             .values
         )
-        targets = (
+        features_deaths = (
             self.weekly_deaths.loc[self.weekly_deaths.district_id == district]
             .drop(columns="district_id")
             .iloc[week_1:week_2]
             .values.flatten()
         )
-        if len(targets) == 0:
-            targets = np.zeros(week_2 - week_1)
+        if len(features_deaths) == 0:
+            features_deaths = np.zeros(week_2 - week_1)
+        features = np.concatenate(
+            (features_mobility, features_deaths.reshape(-1, 1)), axis=-1
+        )
+        targets = features_deaths
         return features, targets
 
     def get_train_data_district(self, district: int, number_of_weeks: int):
@@ -234,18 +296,11 @@ class DistrictData:
         """
         metadata = self.get_static_metadata()
         c_seqs_norm, c_ys = self.get_train_data(number_of_weeks)
-        print("c seqs")
-        print(c_seqs_norm.shape)
-        raise
         all_counties = np.sort(self.daily_deaths.district_id.unique())
         min_sequence_length = 5
         metas, seqs, y, y_mask = [], [], [], []
         for meta, seq, ys in zip(metadata, c_seqs_norm, c_ys):
-            print("-----------")
-            print(seq)
-            print("//")
             seq, ys, ys_mask = self.create_window_seqs(seq, ys, min_sequence_length)
-            print(seq.shape)
             metas.append(meta)
             seqs.append(seq[[-1]])
             y.append(ys[[-1]])
@@ -263,12 +318,12 @@ class DistrictData:
             all_county_ys,
             all_county_y_mask,
         )
-        print("X train")
-        print(X_train.shape)
+        y_train = y_train.unsqueeze(2)
 
         train_dataset = SeqData(
             counties_train, metas_train, X_train, y_train, y_mask_train
         )
+        batch_size = 8
         train_loader = torch.utils.data.DataLoader(
             train_dataset, batch_size=batch_size, shuffle=True
         )
@@ -276,8 +331,3 @@ class DistrictData:
         assert all_county_seqs.shape[1] == all_county_ys.shape[1]
         seqlen = all_county_seqs.shape[1]
         return train_loader, metas_train.shape[1], X_train.shape[2], seqlen
-
-
-def fetch_june_data(initial_day: str, number_of_weeks: int):
-    district_data = DistrictData(initial_day=initial_day)
-    return district_data.prepare_data_for_training(number_of_weeks=number_of_weeks)

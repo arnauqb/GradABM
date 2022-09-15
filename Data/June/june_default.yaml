@@ -9,8 +9,8 @@ data_path: '@torch_june/worlds/data_london_small.pkl'
 save_path: ./example
 
 timer:
-  total_days: 23
-  initial_day: '2022-02-01'
+  total_days: 55
+  initial_day: '2022-03-16'
   step_duration:
     weekday:
       0: 24

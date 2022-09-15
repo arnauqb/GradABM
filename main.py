@@ -70,6 +70,8 @@ if __name__ == "__main__":
     parser.add_argument('-i','--inference_only', action='store_true',help='Will not train if True, inference only')
     parser.add_argument('-no','--noise', type=int, help='Noise level for robustness experiments', default = 0)
     parser.add_argument('-f', '--results_file_postfix', help='Postfix to be appended to output dir for ease of interpretation', default = '')
+    parser.add_argument('-id', '--initial_day', help='Initial day', default = '2020-03-15')
+    parser.add_argument('-nw', '--number_of_weeks', help='Number of weeks', default = 8)
     parser.set_defaults(joint=True)  # make true when removing no joint
     parser.set_defaults(inference_only=False)  # make true when removing no joint
     args = parser.parse_args()

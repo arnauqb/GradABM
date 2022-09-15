@@ -6,6 +6,7 @@ import os
 import torch.nn as nn
 import math
 import time
+from pathlib import Path
 from torch.autograd import Variable
 from data_utils import WEEKS_AHEAD, states, counties
 from copy import copy
@@ -19,7 +20,7 @@ from model_utils import (
     SEIRM,
     SIRS,
 )
-from june import fetch_june_data, June
+from june import DistrictData, June
 import pdb
 
 BENCHMARK_TRAIN = False
@@ -54,7 +55,7 @@ DAYS_HEAD = 4 * 7  # 4 weeks ahead
 
 pi = torch.FloatTensor([math.pi])
 
-SAVE_MODEL_PATH = "./Models/"
+SAVE_MODEL_PATH = Path("./Models/")
 
 # neural network predicting parameters of the ABM
 
@@ -207,16 +208,15 @@ def normal(x, mu, sigma_sq):
 
 
 def save_model(model, file_name, disease, region, week):
-    PATH = os.path.join(SAVE_MODEL_PATH, disease, region)
-    if not os.path.exists(PATH):
-        os.makedirs(PATH)
-    torch.save(model.state_dict(), PATH + "/" + file_name + " " + week + ".pth")
+    path = SAVE_MODEL_PATH / disease / region
+    path.mkdir(exist_ok=True, parents=True)
+    torch.save(model.state_dict(), path / (file_name + " " + week + ".pth"))
 
 
 def load_model(model, file_name, disease, region, week, device):
-    PATH = os.path.join(SAVE_MODEL_PATH, disease, region)
+    path = SAVE_MODEL_PATH / disease / region
     model.load_state_dict(
-        torch.load(PATH + "/" + file_name + " " + week + ".pth", map_location=device)
+        torch.load(path / (file_name + " " + week + ".pth"), map_location=device)
     )
     return model
 
@@ -224,6 +224,8 @@ def load_model(model, file_name, disease, region, week, device):
 def param_model_forward(param_model, params, x, meta):
     # get R0 from county network
     if params["model_name"].startswith("GradABM-time-varying"):
+        action_value = param_model.forward(x, meta)  # time-varying
+    elif params["model_name"].startswith("june"):
         action_value = param_model.forward(x, meta)  # time-varying
     elif params["model_name"] == "ABM-expert":
         if params["disease"] == "COVID":
@@ -277,7 +279,9 @@ def build_param_model(params, metas_train_dim, X_train_dim, device, CUSTOM_INIT=
     assert training_weeks == int(training_weeks)
 
     """ call constructor of param model depending on the model we want to run"""
-    if params["model_name"].startswith("GradABM-time-varying"):
+    if params["model_name"].startswith("GradABM-time-varying") or params[
+        "model_name"
+    ].startswith("june"):
         param_model = CalibNN(
             metas_train_dim,
             X_train_dim,
@@ -306,7 +310,6 @@ def build_param_model(params, metas_train_dim, X_train_dim, device, CUSTOM_INIT=
 def build_simulator(params, devices, counties):
     """build simulator: ABM or ODE"""
 
-    print(params)
     if "ABM" in params["model_name"]:
         if params["joint"]:
             abm = {}
@@ -334,7 +337,7 @@ def build_simulator(params, devices, counties):
             abm = SIRS(params, devices[0])
 
     elif "june" in params["model_name"]:
-        abm = June(params, abm_device)
+        abm = June(params, devices)
 
     return abm
 
@@ -342,46 +345,50 @@ def build_simulator(params, devices, counties):
 def forward_simulator(params, param_values, abm, training_num_steps, counties, devices):
     """assumes abm contains only one simulator for covid (one county), and multiple for flu (multiple counties)"""
 
-    if params["joint"]:
-        num_counties = len(counties)
-        predictions = torch.empty((num_counties, training_num_steps)).to(devices[0])
-        for time_step in range(training_num_steps):
-            if "time-varying" in params["model_name"]:
-                param_t = param_values[:, time_step // 7, :]
-            else:
-                param_t = param_values
-            # go over each abm
-            for c in range(num_counties):
-                model_device = abm[counties[c]].device
-                population = abm[counties[c]].num_agents
-                _, pred_t = abm[counties[c]].step(
-                    time_step, param_t[c].to(model_device)
-                )
-                predictions[c, time_step] = pred_t.to(devices[0])
-    else:
-        num_counties = 1
-        param_values = param_values.squeeze(0)
+    if params["model_name"] == "june":
         predictions = []
-        for time_step in range(training_num_steps):
-            if "time-varying" in params["model_name"]:
-                param_t = param_values[time_step // 7, :]
-            else:
-                param_t = param_values
-            model_device = abm.device
-            _, pred_t = abm.step(time_step, param_t.to(model_device))
-            predictions.append(pred_t.to(devices[0]))
-        predictions = torch.stack(predictions, 0).reshape(
-            1, -1
-        )  # num counties, seq len
+        predictions = abm.step(param_values)
+    else:
+        if params["joint"]:
+            num_counties = len(counties)
+            predictions = torch.empty((num_counties, training_num_steps)).to(devices[0])
+            for time_step in range(training_num_steps):
+                if "time-varying" in params["model_name"]:
+                    param_t = param_values[:, time_step // 7, :]
+                else:
+                    param_t = param_values
+                # go over each abm
+                for c in range(num_counties):
+                    model_device = abm[counties[c]].device
+                    population = abm[counties[c]].num_agents
+                    _, pred_t = abm[counties[c]].step(
+                        time_step, param_t[c].to(model_device)
+                    )
+                    predictions[c, time_step] = pred_t.to(devices[0])
+        else:
+            num_counties = 1
+            param_values = param_values.squeeze(0)
+            predictions = []
+            for time_step in range(training_num_steps):
+                if "time-varying" in params["model_name"]:
+                    param_t = param_values[time_step // 7, :]
+                else:
+                    param_t = param_values
+                model_device = abm.device
+                _, pred_t = abm.step(time_step, param_t.to(model_device))
+                predictions.append(pred_t.to(devices[0]))
+            predictions = torch.stack(predictions, 0).reshape(
+                1, -1
+            )  # num counties, seq len
 
     # post-process predictions for flu
     # targets are weekly, so we have to convert from daily to weekly
-    if params["disease"] == "Flu":
-        predictions = predictions.reshape(num_counties, -1, 7).sum(2)
-    else:
-        predictions = predictions.reshape(num_counties, -1)
-
-    return predictions.unsqueeze(2)
+    if not params["model_name"].startswith("june"):
+        if params["disease"] == "Flu":
+            predictions = predictions.reshape(num_counties, -1, 7).sum(2)
+        else:
+            predictions = predictions.reshape(num_counties, -1)
+    return  predictions.unsqueeze(2)
 
 
 def runner(params, devices, verbose):
@@ -393,11 +400,16 @@ def runner(params, devices, verbose):
 
         # get data loaders and ground truth targets
         if params["model_name"] == "june":
-            train_loader, metas_train_dim, X_train_dim, seqlen = fetch_june_data(
-                initial_day=params["initial_day"],
-                pred_week = params["pred_week"]
+            district_data = DistrictData.from_file(initial_day=params["initial_day"])
+            (
+                train_loader,
+                metas_train_dim,
+                X_train_dim,
+                seqlen,
+            ) = district_data.prepare_data_for_training(
+                number_of_weeks=params["number_of_weeks"]
             )
-            params["num_steps"] = seqlen
+            params["num_steps"] = seqlen * 7
         else:
             if params["disease"] == "COVID":
                 if params["joint"]:
@@ -467,9 +479,7 @@ def runner(params, devices, verbose):
         # do not train ABM because it uses a different calibration procedure
         train_flag = (
             False
-            if params["model_name"].startswith("ABM")
-            or params["inference_only"]
-            or params["model_name"].startswith("june")
+            if params["model_name"].startswith("ABM") or params["inference_only"]
             else True
         )
 
@@ -494,6 +504,7 @@ def runner(params, devices, verbose):
             best_loss = np.inf
             losses = []
             for epi in range(num_epochs):
+                print(epi)
                 start = time.time()
                 batch_predictions = []
                 if verbose:
@@ -501,9 +512,12 @@ def runner(params, devices, verbose):
                     print("Epoch: ", epi)
                 epoch_loss = 0
                 for batch, (counties, meta, x, y) in enumerate(train_loader):
+                    print("--------------")
                     print(batch, counties)
                     # construct abm for each forward pass
                     abm = build_simulator(copy(params), devices, counties)
+                    if params["model_name"].startswith("june"):
+                        abm._assign_district_to_agents(district_data)
                     # forward pass param model
                     meta = meta.to(devices[0])
                     x = x.to(devices[0])
@@ -528,10 +542,11 @@ def runner(params, devices, verbose):
                     # loss
                     if verbose:
                         print(torch.cat((y, predictions), 2))
-                    loss_weight = torch.ones((len(counties), training_num_steps, 1)).to(
-                        devices[0]
-                    )
-                    loss = (loss_weight * loss_fcn(y, predictions)).mean()
+                    #loss_weight = torch.ones((len(counties), training_num_steps, 1)).to(
+                    #    devices[0]
+                    #)
+                    #loss = (loss_weight * loss_fcn(y, predictions)).mean()
+                    loss = loss_fcn(y, predictions).mean()
                     loss.backward()
                     torch.nn.utils.clip_grad_norm_(param_model.parameters(), CLIP)
                     opt.step()
@@ -688,6 +703,8 @@ def train_predict(args):
     params["inference_only"] = args.inference_only
     params["noise_level"] = args.noise  # for robustness experiments
     params["model_name"] = args.model_name
+    params["initial_day"] = args.initial_day
+    params["number_of_weeks"] = int(args.number_of_weeks)
     # state
     params["state"] = args.state
     if params["model_name"] != "june":
