@@ -60,6 +60,85 @@ SAVE_MODEL_PATH = Path("./Models/")
 # neural network predicting parameters of the ABM
 
 
+class CalibNNJune(nn.Module):
+    def __init__(
+        self,
+        metas_train_dim,
+        X_train_dim,
+        device,
+        training_weeks,
+        n_districts,
+        n_parameters_to_calibrate=None,
+        hidden_dim=32,
+        out_dim=1,
+        n_layers=2,
+        bidirectional=True,
+    ):
+        super().__init__()
+
+        self.device = device
+
+        self.training_weeks = training_weeks
+
+        """ tune """
+        hidden_dim = 64
+        out_layer_dim = 32
+
+        self.emb_model = EmbedAttenSeq(
+            dim_seq_in=X_train_dim,
+            dim_metadata=metas_train_dim,
+            rnn_out=hidden_dim,
+            dim_out=hidden_dim,
+            n_layers=n_layers,
+            bidirectional=bidirectional,
+        )
+
+        self.decoder = DecodeSeq(
+            dim_seq_in=1,
+            rnn_out=hidden_dim,  # divides by 2 if bidirectional
+            dim_out=out_layer_dim,
+            n_layers=1,
+            bidirectional=True,
+        )
+        out_layer_width = out_layer_dim * n_districts
+        self.out_layer = [
+            nn.Linear(in_features=out_layer_width, out_features=out_layer_width // 2),
+            nn.ReLU(),
+            nn.Linear(in_features=out_layer_width // 2, out_features=out_dim),
+        ]
+        self.out_layer = nn.Sequential(*self.out_layer)
+
+        def init_weights(m):
+            if isinstance(m, nn.Linear):
+                torch.nn.init.xavier_uniform_(m.weight)
+                m.bias.data.fill_(1.0)
+
+        self.out_layer.apply(init_weights)
+        self.min_values = torch.tensor(-3.0, device=self.device)
+        self.max_values = torch.tensor(2.0, device=self.device)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x, meta):
+        x_embeds, encoder_hidden = self.emb_model.forward(x.transpose(1, 0), meta)
+        # create input that will tell the neural network which week it is predicting
+        # thus, we have one element in the sequence per each week of R0
+        time_seq = (
+            # torch.arange(1, self.training_weeks + WEEKS_AHEAD + 1)
+            torch.tensor([1])
+            .repeat(x_embeds.shape[0], 1)
+            .unsqueeze(2)
+        )
+        Hi_data = time_seq.float().to(self.device)
+        # Hi_data = ((time_seq - time_seq.min()) / (time_seq.max() - time_seq.min())).to(
+        #    self.device
+        # )
+        emb = self.decoder(Hi_data, encoder_hidden, x_embeds)
+        emb = emb.reshape(1, 1, -1)
+        out = self.out_layer(emb)
+        out = self.min_values + (self.max_values - self.min_values) * self.sigmoid(out)
+        return out
+
+
 class CalibNN(nn.Module):
     def __init__(
         self,
@@ -262,7 +341,15 @@ def param_model_forward(param_model, params, x, meta):
     return action_value
 
 
-def build_param_model(params, metas_train_dim, X_train_dim, device, CUSTOM_INIT=True):
+def build_param_model(
+    params,
+    metas_train_dim,
+    X_train_dim,
+    device,
+    CUSTOM_INIT=True,
+    n_parameters_to_calibrate=None,
+    n_districts=None
+):
 
     # get param dimension for ODE
     if params["disease"] == "COVID":
@@ -282,13 +369,14 @@ def build_param_model(params, metas_train_dim, X_train_dim, device, CUSTOM_INIT=
     if params["model_name"].startswith("GradABM-time-varying") or params[
         "model_name"
     ].startswith("june"):
-        param_model = CalibNN(
+        param_model = CalibNNJune(
             metas_train_dim,
             X_train_dim,
             device,
             training_weeks,
-            out_dim=abm_param_dim,
-            scale_output=scale_output_abm,
+            n_districts=n_districts,
+            out_dim=n_parameters_to_calibrate,
+            n_parameters_to_calibrate=n_parameters_to_calibrate,
         ).to(device)
     elif params["model_name"] == "ABM-expert":
         param_model = None
@@ -388,10 +476,15 @@ def forward_simulator(params, param_values, abm, training_num_steps, counties, d
             predictions = predictions.reshape(num_counties, -1, 7).sum(2)
         else:
             predictions = predictions.reshape(num_counties, -1)
-    return  predictions.unsqueeze(2)
+    return predictions.unsqueeze(2)
 
 
 def runner(params, devices, verbose):
+    if params["model_name"].startswith("june"):
+        abm = build_simulator(copy(params), devices, None)
+        n_parameters_to_calibrate = len(abm.parameters_to_calibrate)
+    else:
+        n_parameters_to_calibrate = None
     for run_id in range(params["num_runs"]):
         print("Run: ", run_id)
 
@@ -399,18 +492,22 @@ def runner(params, devices, verbose):
         batch_size = max(len(devices) - 1, 1)
 
         # get data loaders and ground truth targets
-        if params["model_name"] == "june":
+        if params["model_name"].startswith("june"):
             district_data = DistrictData.from_file(initial_day=params["initial_day"])
+            abm._assign_district_to_agents(district_data)
             (
                 train_loader,
                 metas_train_dim,
                 X_train_dim,
                 seqlen,
             ) = district_data.prepare_data_for_training(
-                number_of_weeks=params["number_of_weeks"]
+                number_of_weeks=params["number_of_weeks"],
+                districts_map=abm.districts_map,
             )
             params["num_steps"] = seqlen * 7
+            n_districts = abm.number_of_districts
         else:
+            n_districts = None
             if params["disease"] == "COVID":
                 if params["joint"]:
                     (
@@ -472,7 +569,13 @@ def runner(params, devices, verbose):
         training_num_steps = params["num_steps"]
         params["num_steps"] += DAYS_HEAD
         param_model = build_param_model(
-            params, metas_train_dim, X_train_dim, devices[0], CUSTOM_INIT=True
+            params,
+            metas_train_dim,
+            X_train_dim,
+            devices[0],
+            CUSTOM_INIT=True,
+            n_parameters_to_calibrate=n_parameters_to_calibrate,
+            n_districts=n_districts
         )
         # filename to save/load model
         file_name = "param_model" + "_" + params["model_name"]
@@ -515,9 +618,8 @@ def runner(params, devices, verbose):
                     print("--------------")
                     print(batch, counties)
                     # construct abm for each forward pass
-                    abm = build_simulator(copy(params), devices, counties)
-                    if params["model_name"].startswith("june"):
-                        abm._assign_district_to_agents(district_data)
+                    if not params["model_name"].startswith("june"):
+                        abm = build_simulator(copy(params), devices, counties)
                     # forward pass param model
                     meta = meta.to(devices[0])
                     x = x.to(devices[0])
@@ -534,6 +636,10 @@ def runner(params, devices, verbose):
                     predictions = forward_simulator(
                         params, param_values, abm, training_num_steps, counties, devices
                     )
+                    #print("*"*10)
+                    #print(predictions)
+                    #print(y)
+                    #print("*"*10)
                     if BENCHMARK_TRAIN:
                         # quit after 1 epoch
                         print("No steps:", training_num_steps)
@@ -542,10 +648,10 @@ def runner(params, devices, verbose):
                     # loss
                     if verbose:
                         print(torch.cat((y, predictions), 2))
-                    #loss_weight = torch.ones((len(counties), training_num_steps, 1)).to(
+                    # loss_weight = torch.ones((len(counties), training_num_steps, 1)).to(
                     #    devices[0]
-                    #)
-                    #loss = (loss_weight * loss_fcn(y, predictions)).mean()
+                    # )
+                    # loss = (loss_weight * loss_fcn(y, predictions)).mean()
                     loss = loss_fcn(y, predictions).mean()
                     loss.backward()
                     torch.nn.utils.clip_grad_norm_(param_model.parameters(), CLIP)
@@ -582,10 +688,16 @@ def runner(params, devices, verbose):
 
         """ step 2: inference step  """
         """ upload best model in inference """
+        print("TRAINING ENDED")
         param_model = None
-        abm = None
         param_model = build_param_model(
-            copy(params), metas_train_dim, X_train_dim, devices[0], CUSTOM_INIT=True
+            copy(params),
+            metas_train_dim,
+            X_train_dim,
+            devices[0],
+            CUSTOM_INIT=True,
+            n_parameters_to_calibrate=n_parameters_to_calibrate,
+            n_districts=n_districts
         )
         if not params["model_name"].startswith("ABM"):
             # load param model if it is not ABM-expert
@@ -634,7 +746,8 @@ def runner(params, devices, verbose):
         with torch.no_grad():
             for batch, (counties, meta, x, y) in enumerate(train_loader):
                 # construct abm for each forward pass
-                abm = build_simulator(params, devices, counties)
+                if not params["model_name"].startswith("june"):
+                    abm = build_simulator(params, devices, counties)
                 # forward pass param model
                 meta = meta.to(devices[0])
                 x = x.to(devices[0])

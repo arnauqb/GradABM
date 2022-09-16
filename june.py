@@ -2,6 +2,7 @@ from dis import dis
 from tkinter import W
 import torch
 import numpy as np
+import yaml
 import pandas as pd
 from torch.nn.utils.rnn import pad_sequence
 from sklearn.preprocessing import StandardScaler
@@ -40,8 +41,13 @@ class June:
     Wrapper around torch_june
     """
 
-    def __init__(self, params, device):
+    def __init__(self, params, device: str):
         self.runner = Runner.from_file(default_june_config_path)
+        self.number_of_districts = None
+        self.districts_map = None
+        with open(default_june_config_path, "r") as f:
+            june_params = yaml.safe_load(f)
+            self.parameters_to_calibrate = june_params["parameters_to_calibrate"]
 
     @property
     def device(self):
@@ -55,20 +61,26 @@ class June:
         ret_idcs = np.searchsorted(np.sort(np.unique(district_ids)), district_ids)
         ret = district_nums[ret_idcs]
         self.runner.data["agent"].district = ret
+        self.number_of_districts = self.runner.data["agent"].district.unique().shape[0]
+        self.districts_map = np.sort(np.unique(district_ids))
+        print("NUMBER OF DISTRICTS")
+        print(self.runner.data["agent"].district.unique().shape[0])
 
     def _set_param_values(self, param_values):
-        for i, param_name in enumerate(["infection_networks.networks.pub.log_beta"]):
-            set_attribute(self.runner.model, param_name, param_values.flatten()[i])
+        param_values = param_values.flatten()
+        for param_name, param_value in zip(self.parameters_to_calibrate, param_values):
+            set_attribute(self.runner.model, param_name, param_value)
 
     def _get_deaths_per_week(self):
         deaths_by_district_timestep = self.runner.data["results"][
             "daily_deaths_by_district"
-        ].transpose(0,1)
+        ].transpose(0, 1)
         deaths_cumsum = deaths_by_district_timestep.cumsum(1)
         mask = torch.zeros(deaths_cumsum.shape[1], dtype=torch.long)
         mask[::7] = 1
         mask = mask.to(torch.bool)
         ret = deaths_cumsum[:, mask]
+        ret = torch.diff(ret, prepend=torch.zeros(ret.shape[0], 1), dim=1)
         return ret
 
     def step(self, param_values):
@@ -233,8 +245,8 @@ class DistrictData:
             number_of_training_weeks + number_of_testing_weeks + 1,
         )
 
-    def get_train_data(self, number_of_weeks: int):
-        districts = np.sort(self.weekly_mobility_data.district_id.unique())
+    def get_train_data(self, number_of_weeks: int, districts):
+        # districts = np.sort(self.weekly_mobility_data.district_id.unique())
         features = []
         targets = []
         for district in districts:
@@ -290,12 +302,12 @@ class DistrictData:
 
         return seqs, ys, mask_ys
 
-    def prepare_data_for_training(self, number_of_weeks: int, batch_size=1):
+    def prepare_data_for_training(self, number_of_weeks: int, districts_map):
         """
         Prepare train and validation dataset
         """
         metadata = self.get_static_metadata()
-        c_seqs_norm, c_ys = self.get_train_data(number_of_weeks)
+        c_seqs_norm, c_ys = self.get_train_data(number_of_weeks, districts_map)
         all_counties = np.sort(self.daily_deaths.district_id.unique())
         min_sequence_length = 5
         metas, seqs, y, y_mask = [], [], [], []
@@ -323,9 +335,8 @@ class DistrictData:
         train_dataset = SeqData(
             counties_train, metas_train, X_train, y_train, y_mask_train
         )
-        batch_size = 8
         train_loader = torch.utils.data.DataLoader(
-            train_dataset, batch_size=batch_size, shuffle=True
+            train_dataset, batch_size=X_train.shape[0], shuffle=True
         )
 
         assert all_county_seqs.shape[1] == all_county_ys.shape[1]
