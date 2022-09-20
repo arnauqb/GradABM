@@ -6,6 +6,7 @@ import os
 import torch.nn as nn
 import math
 import time
+import pandas as pd
 from pathlib import Path
 from torch.autograd import Variable
 from data_utils import WEEKS_AHEAD, states, counties
@@ -24,7 +25,7 @@ from june import DistrictData, June
 import pdb
 
 BENCHMARK_TRAIN = False
-NUM_EPOCHS_DIFF = 100
+NUM_EPOCHS_DIFF = 1000
 print("---- MAIN IMPORTS SUCCESSFUL -----")
 epsilon = 1e-6
 
@@ -348,7 +349,7 @@ def build_param_model(
     device,
     CUSTOM_INIT=True,
     n_parameters_to_calibrate=None,
-    n_districts=None
+    n_districts=None,
 ):
 
     # get param dimension for ODE
@@ -575,7 +576,7 @@ def runner(params, devices, verbose):
             devices[0],
             CUSTOM_INIT=True,
             n_parameters_to_calibrate=n_parameters_to_calibrate,
-            n_districts=n_districts
+            n_districts=n_districts,
         )
         # filename to save/load model
         file_name = "param_model" + "_" + params["model_name"]
@@ -588,11 +589,12 @@ def runner(params, devices, verbose):
 
         num_epochs = NUM_EPOCHS_DIFF
         CLIP = 10
-        if "learnable-params" in params["model_name"]:
-            lr = 1e-2  # obtained after tuning
-            num_epochs *= 2
-        else:
-            lr = 1e-4 if params["model_name"].startswith("GradABM") else 1e-4
+        #if "learnable-params" in params["model_name"]:
+        #    lr = 1e-2  # obtained after tuning
+        #    num_epochs *= 2
+        #else:
+        #    lr = 1e-4 if params["model_name"].startswith("GradABM") else 1e-4
+        lr = 1e-1
 
         """ step 1: training  """
         if train_flag:
@@ -606,6 +608,7 @@ def runner(params, devices, verbose):
             loss_fcn = torch.nn.MSELoss(reduction="none")
             best_loss = np.inf
             losses = []
+            df = pd.DataFrame(columns=["loss"])
             for epi in range(num_epochs):
                 print(epi)
                 start = time.time()
@@ -636,10 +639,10 @@ def runner(params, devices, verbose):
                     predictions = forward_simulator(
                         params, param_values, abm, training_num_steps, counties, devices
                     )
-                    #print("*"*10)
-                    #print(predictions)
-                    #print(y)
-                    #print("*"*10)
+                    # print("*"*10)
+                    # print(predictions)
+                    # print(y)
+                    # print("*"*10)
                     if BENCHMARK_TRAIN:
                         # quit after 1 epoch
                         print("No steps:", training_num_steps)
@@ -659,12 +662,14 @@ def runner(params, devices, verbose):
                     opt.zero_grad(set_to_none=True)
                     epoch_loss += torch.sqrt(loss.detach()).item()
                 losses.append(epoch_loss / (batch + 1))  # divide by number of batches
+                df.loc[epi, "loss"] = epoch_loss / (batch + 1)
                 if verbose:
                     print("epoch_loss", epoch_loss)
 
                 if torch.isnan(loss):
                     break
                 """ save best model """
+                df.to_csv("./losses.csv", index=False)
                 if epoch_loss < best_loss:
                     if params["joint"]:
                         save_model(
@@ -697,7 +702,7 @@ def runner(params, devices, verbose):
             devices[0],
             CUSTOM_INIT=True,
             n_parameters_to_calibrate=n_parameters_to_calibrate,
-            n_districts=n_districts
+            n_districts=n_districts,
         )
         if not params["model_name"].startswith("ABM"):
             # load param model if it is not ABM-expert
