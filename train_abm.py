@@ -69,9 +69,8 @@ class CalibNNJune(nn.Module):
         device,
         training_weeks,
         n_districts,
-        n_parameters_to_calibrate=None,
+        parameters_to_calibrate=None,
         hidden_dim=32,
-        out_dim=1,
         n_layers=2,
         bidirectional=True,
     ):
@@ -102,6 +101,7 @@ class CalibNNJune(nn.Module):
             bidirectional=True,
         )
         out_layer_width = out_layer_dim * n_districts
+        out_dim = len(parameters_to_calibrate)
         self.out_layer = [
             nn.Linear(in_features=out_layer_width, out_features=out_layer_width // 2),
             nn.ReLU(),
@@ -115,8 +115,12 @@ class CalibNNJune(nn.Module):
                 m.bias.data.fill_(1.0)
 
         self.out_layer.apply(init_weights)
-        self.min_values = torch.tensor(-3.0, device=self.device)
-        self.max_values = torch.tensor(2.0, device=self.device)
+        self.min_values = torch.tensor(
+            [parameters_to_calibrate[param]["min_value"] for param in parameters_to_calibrate]
+        )
+        self.max_values = torch.tensor(
+            [parameters_to_calibrate[param]["max_value"] for param in parameters_to_calibrate]
+        )
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x, meta):
@@ -348,7 +352,7 @@ def build_param_model(
     X_train_dim,
     device,
     CUSTOM_INIT=True,
-    n_parameters_to_calibrate=None,
+    parameters_to_calibrate=None,
     n_districts=None,
 ):
 
@@ -376,8 +380,7 @@ def build_param_model(
             device,
             training_weeks,
             n_districts=n_districts,
-            out_dim=n_parameters_to_calibrate,
-            n_parameters_to_calibrate=n_parameters_to_calibrate,
+            parameters_to_calibrate=parameters_to_calibrate,
         ).to(device)
     elif params["model_name"] == "ABM-expert":
         param_model = None
@@ -483,9 +486,9 @@ def forward_simulator(params, param_values, abm, training_num_steps, counties, d
 def runner(params, devices, verbose):
     if params["model_name"].startswith("june"):
         abm = build_simulator(copy(params), devices, None)
-        n_parameters_to_calibrate = len(abm.parameters_to_calibrate)
+        parameters_to_calibrate = abm.parameters_to_calibrate
     else:
-        n_parameters_to_calibrate = None
+        parameters_to_calibrate = None
     for run_id in range(params["num_runs"]):
         print("Run: ", run_id)
 
@@ -575,7 +578,7 @@ def runner(params, devices, verbose):
             X_train_dim,
             devices[0],
             CUSTOM_INIT=True,
-            n_parameters_to_calibrate=n_parameters_to_calibrate,
+            parameters_to_calibrate=parameters_to_calibrate,
             n_districts=n_districts,
         )
         # filename to save/load model
@@ -589,12 +592,12 @@ def runner(params, devices, verbose):
 
         num_epochs = NUM_EPOCHS_DIFF
         CLIP = 10
-        #if "learnable-params" in params["model_name"]:
+        # if "learnable-params" in params["model_name"]:
         #    lr = 1e-2  # obtained after tuning
         #    num_epochs *= 2
-        #else:
+        # else:
         #    lr = 1e-4 if params["model_name"].startswith("GradABM") else 1e-4
-        lr = 1e-1
+        lr = 1e-4
 
         """ step 1: training  """
         if train_flag:
@@ -701,7 +704,7 @@ def runner(params, devices, verbose):
             X_train_dim,
             devices[0],
             CUSTOM_INIT=True,
-            n_parameters_to_calibrate=n_parameters_to_calibrate,
+            parameters_to_calibrate=parameters_to_calibrate,
             n_districts=n_districts,
         )
         if not params["model_name"].startswith("ABM"):

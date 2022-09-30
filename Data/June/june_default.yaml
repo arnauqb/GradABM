@@ -4,25 +4,45 @@ system:
   device: cpu
   random_seed: random
 
-data_path: '@torch_june/worlds/data_london_medium.pkl'
+data_path: '@torch_june/worlds/data_london_small.pkl'
 
 save_path: ./example
 
 parameters_to_calibrate:
-  - infection_networks.networks.household.log_beta
-  - infection_networks.networks.school.log_beta
-  - infection_networks.networks.company.log_beta
-  - infection_networks.networks.gym.log_beta
-  - infection_networks.networks.pub.log_beta
-  - infection_networks.networks.grocery.log_beta
-  - infection_networks.networks.visit.log_beta
-  - infection_networks.networks.cinema.log_beta
-  - infection_networks.networks.university.log_beta
-  - infection_networks.networks.care_home.log_beta
+  model.infection_networks.networks.household.log_beta:
+    min_value: -3.0
+    max_value: 2.0
+  model.infection_networks.networks.school.log_beta:
+    min_value: -3.0
+    max_value: 2.0
+  model.infection_networks.networks.company.log_beta:
+    min_value: -3.0
+    max_value: 2.0
+  model.infection_networks.networks.leisure.log_beta:
+    min_value: -3.0
+    max_value: 2.0
+  #model.infection_networks.networks.university.log_beta:
+  #  min_value: -3.0
+  #  max_value: 2.0
+  #model.infection_networks.networks.care_home.log_beta:
+  #  min_value: -3.0
+  #  max_value: 2.0
+  model.policies.interaction_policies.0.beta_factors.all:
+    min_value: 0.0
+    max_value: 1.0
+  model.policies.interaction_policies.1.beta_factors.all:
+    min_value: 0.0
+    max_value: 1.0
+  model.policies.interaction_policies.2.beta_factors.all:
+    min_value: 0.0
+    max_value: 1.0
+  fraction_initial_cases:
+    min_value: 0.0
+    max_value: 1.0
 
 timer:
-  total_days: 69
-  initial_day: '2022-03-16'
+  total_days: 139 # to 2020-07-04
+  initial_day: '2020-02-16'
   step_duration:
     weekday:
       0: 24
@@ -55,57 +75,48 @@ timer:
       - household
 
 infection_seed:
-  n_initial_cases: 1000
+  fraction_initial_cases: 0.05
 
 networks:
   household:
-    log_beta: -0.4
+    log_beta: 0.5
   company:
-    log_beta: -0.3
+    log_beta: 0.5
   school:
-    log_beta: -0.3
+    log_beta: 0.5
   pub:
-    log_beta: -1.2
+    log_beta: 1.0
   gym:
-    log_beta: -1.2
+    log_beta: 1.0
   grocery:
-    log_beta: -1.2
+    log_beta: 1.0
   visit:
-    log_beta: -1.2
+    log_beta: 1.0
   cinema:
-    log_beta: -1.2
+    log_beta: 1.0
   university:
-    log_beta: -0.5
+    log_beta: 0.5
   care_home:
-    log_beta: -0.4
+    log_beta: 0.5
 
 policies:
   interaction:
     social_distancing:
       1:
-        start_date: 2022-02-15
-        end_date: 2022-03-15
+        start_date: 2020-03-16
+        end_date: 2020-03-24
         beta_factors:
-          school: 0.5
-          company: 0.5
+          all: 0.75
       2:
-        start_date: 2022-03-15
-        end_date: 2022-04-15
+        start_date: 2020-03-24
+        end_date: 2020-05-11
         beta_factors:
-          pub: 0.5
-          cinema: 0.5
-          gym: 0.5
-          grocery: 0.5
-          visit: 0.5
+          all: 0.5
       3:
-        start_date: 2023-04-15
-        end_date: 2022-05-15
+        start_date: 2020-05-11
+        end_date: 2999-01-01
         beta_factors:
-          pub: 0.5
-          cinema: 0.5
-          gym: 0.5
-          grocery: 0.5
-          visit: 0.5
+          all: 0.75
 
 transmission:
   max_infectiousness:

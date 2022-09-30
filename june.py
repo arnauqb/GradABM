@@ -1,6 +1,7 @@
 from dis import dis
 from tkinter import W
 import torch
+import pickle
 import numpy as np
 import yaml
 import pandas as pd
@@ -9,6 +10,7 @@ from sklearn.preprocessing import StandardScaler
 
 from paths import default_data_path
 from torch_june import Runner
+from torch_june.utils import read_path
 from model_utils import SeqData
 
 default_june_data_path = default_data_path / "June"
@@ -21,7 +23,11 @@ default_area_to_district_filename = default_june_data_path / "area_district.csv"
 def get_attribute(base, path):
     paths = path.split(".")
     for p in paths:
-        base = getattr(base, p)
+        if not any(i.isdigit() for i in p):
+            base = getattr(base, p)
+        else:
+            pn = int(p)
+            base = base[pn]
     return base
 
 
@@ -29,7 +35,11 @@ def set_attribute(base, path, target):
     paths = path.split(".")
     _base = base
     for p in paths[:-1]:
-        _base = getattr(_base, p)
+        if not any(i.isdigit() for i in p):
+            _base = getattr(_base, p)
+        else:
+            pn = int(p)
+            _base = _base[pn]
     if type(_base) == dict:
         _base[paths[-1]] = target
     else:
@@ -48,6 +58,7 @@ class June:
         with open(default_june_config_path, "r") as f:
             june_params = yaml.safe_load(f)
             self.parameters_to_calibrate = june_params["parameters_to_calibrate"]
+        self.param_values_df = pd.DataFrame(columns=self.parameters_to_calibrate.keys())
 
     @property
     def device(self):
@@ -61,30 +72,48 @@ class June:
         ret_idcs = np.searchsorted(np.sort(np.unique(district_ids)), district_ids)
         ret = district_nums[ret_idcs]
         self.runner.data["agent"].district = ret
+        data_path = read_path(self.runner._parameters["data_path"])
+        pickle.dump(self.runner.data, open(data_path, "wb"))  # save districts
         self.number_of_districts = self.runner.data["agent"].district.unique().shape[0]
         self.districts_map = np.sort(np.unique(district_ids))
         print("NUMBER OF DISTRICTS")
         print(self.runner.data["agent"].district.unique().shape[0])
+        ret, counts = torch.unique(
+            self.runner.data["agent"].district, return_counts=True
+        )
 
     def _set_param_values(self, param_values):
         param_values = param_values.flatten()
         for param_name, param_value in zip(self.parameters_to_calibrate, param_values):
-            set_attribute(self.runner.model, param_name, param_value)
+            if param_name == "model.infection_networks.networks.leisure.log_beta":
+                for leisure_name in ["pub", "grocery", "gym", "cinema", "visit"]:
+                    pname = param_name.split(".")
+                    pname[-2] = leisure_name
+                    pname = ".".join(pname)
+                    set_attribute(self.runner, pname, param_value)
+            else:
+                set_attribute(self.runner, param_name, param_value)
 
     def _get_deaths_per_week(self):
         deaths_by_district_timestep = self.runner.data["results"][
             "daily_deaths_by_district"
         ].transpose(0, 1)
-        deaths_cumsum = deaths_by_district_timestep.cumsum(1)
-        mask = torch.zeros(deaths_cumsum.shape[1], dtype=torch.long)
-        mask[::7] = 1
+        mask = torch.zeros(deaths_by_district_timestep.shape[1], dtype=torch.long)
+        mask[::7] = 1  # take every 7 days.
         mask = mask.to(torch.bool)
-        ret = deaths_cumsum[:, mask]
+        ret = deaths_by_district_timestep[:, mask]
         ret = torch.diff(ret, prepend=torch.zeros(ret.shape[0], 1), dim=1)
         return ret
 
+    def _save_param_values(self, param_values):
+        self.param_values_df.loc[len(self.param_values_df)] = (
+            param_values.flatten().detach().cpu().numpy()
+        )
+        self.param_values_df.to_csv("./param_values.csv", index=False)
+
     def step(self, param_values):
         self._set_param_values(param_values)
+        self._save_param_values(param_values)
         results, _ = self.runner()
         predictions = self._get_deaths_per_week()
         return predictions
