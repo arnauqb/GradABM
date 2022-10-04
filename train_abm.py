@@ -25,7 +25,7 @@ from june import DistrictData, June
 import pdb
 
 BENCHMARK_TRAIN = False
-NUM_EPOCHS_DIFF = 1000
+NUM_EPOCHS_DIFF = 100
 print("---- MAIN IMPORTS SUCCESSFUL -----")
 epsilon = 1e-6
 
@@ -607,7 +607,7 @@ def runner(params, devices, verbose):
                 lr=lr,
                 weight_decay=0.01,
             )
-
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=100)
             loss_fcn = torch.nn.MSELoss(reduction="none")
             best_loss = np.inf
             losses = []
@@ -672,6 +672,7 @@ def runner(params, devices, verbose):
                     opt.step()
                     opt.zero_grad(set_to_none=True)
                     epoch_loss += torch.sqrt(loss.detach()).item()
+                scheduler.step()
                 losses.append(epoch_loss / (batch + 1))  # divide by number of batches
                 df.loc[epi, "loss"] = epoch_loss / (batch + 1)
                 if verbose:
