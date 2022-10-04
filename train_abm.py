@@ -630,6 +630,11 @@ def runner(params, devices, verbose):
                     meta = meta.to(devices[0])
                     x = x.to(devices[0])
                     y = y.to(devices[0])
+                    #print("#"*10)
+                    #print("x")
+                    #print(x)
+                    #print("y")
+                    #print(y)
                     param_values = param_model_forward(param_model, params, x, meta)
                     if verbose:
                         if param_values.dim() > 2:
@@ -658,6 +663,9 @@ def runner(params, devices, verbose):
                     #    devices[0]
                     # )
                     # loss = (loss_weight * loss_fcn(y, predictions)).mean()
+                    #print("#"*10)
+                    #print(predictions)
+                    #print(y)
                     loss = loss_fcn(y, predictions).mean()
                     loss.backward()
                     torch.nn.utils.clip_grad_norm_(param_model.parameters(), CLIP)

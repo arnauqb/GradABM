@@ -21,12 +21,12 @@ parameters_to_calibrate:
   model.infection_networks.networks.leisure.log_beta:
     min_value: -3.0
     max_value: 2.0
-  #model.infection_networks.networks.university.log_beta:
-  #  min_value: -3.0
-  #  max_value: 2.0
-  #model.infection_networks.networks.care_home.log_beta:
-  #  min_value: -3.0
-  #  max_value: 2.0
+  model.infection_networks.networks.university.log_beta:
+    min_value: -3.0
+    max_value: 2.0
+  model.infection_networks.networks.care_home.log_beta:
+    min_value: -3.0
+    max_value: 2.0
   model.policies.interaction_policies.0.beta_factors.all:
     min_value: 0.0
     max_value: 1.0
@@ -38,11 +38,11 @@ parameters_to_calibrate:
     max_value: 1.0
   fraction_initial_cases:
     min_value: 0.0
-    max_value: 1.0
+    max_value: 0.05
 
 timer:
-  total_days: 139 # to 2020-07-04
-  initial_day: '2020-02-16'
+  total_days: 124 # to 2020-07-04
+  initial_day: '2020-03-01'
   step_duration:
     weekday:
       0: 24
@@ -75,29 +75,29 @@ timer:
       - household
 
 infection_seed:
-  fraction_initial_cases: 0.05
+  fraction_initial_cases: 0.005
 
 networks:
   household:
     log_beta: 0.5
   company:
-    log_beta: 0.5
+    log_beta: 0.0
   school:
-    log_beta: 0.5
+    log_beta: 0.0
   pub:
-    log_beta: 1.0
+    log_beta: 0.0
   gym:
-    log_beta: 1.0
+    log_beta: 0.0
   grocery:
-    log_beta: 1.0
+    log_beta: 0.0
   visit:
-    log_beta: 1.0
+    log_beta: 0.0
   cinema:
-    log_beta: 1.0
+    log_beta: 0.0
   university:
-    log_beta: 0.5
+    log_beta: 0.0
   care_home:
-    log_beta: 0.5
+    log_beta: 0.0
 
 policies:
   interaction:
@@ -165,38 +165,38 @@ symptoms:
       80-90: 0.9
       90-100: 0.9
     symptomatic:
-      0-10: 0.0005
-      10-20: 0.00165
-      20-30: 0.0072
-      30-40: 0.0208
-      40-50: 0.0343
-      50-60: 0.0765
-      60-70: 0.1328
-      70-80: 0.20655
-      80-90: 0.2457
-      90-100: 0.2457
+      0-10: 0.001
+      10-20: 0.003
+      20-30: 0.012
+      30-40: 0.032
+      40-50: 0.049
+      50-60: 0.102
+      60-70: 0.166
+      70-80: 0.243
+      80-90: 0.273
+      90-100: 0.273
     severe:
-      0-10: 3.0e-05
-      10-20: 8.0e-05
-      20-30: 0.00036
-      30-40: 0.00104
-      40-50: 0.00216
-      50-60: 0.00933
-      60-70: 0.03639
-      70-80: 0.08923
-      80-90: 0.1742
-      90-100: 0.1742
+      0-10: 0.005
+      10-20: 0.01
+      20-30: 0.01
+      30-40: 0.01
+      40-50: 0.027
+      50-60: 0.34
+      60-70: 0.39
+      70-80: 0.48
+      80-90: 0.53
+      90-100: 0.72
     critical:
-      0-10: 2.0e-05
-      10-20: 2.0e-05
-      20-30: 0.0001
-      30-40: 0.00032
-      40-50: 0.00098
-      50-60: 0.00265
-      60-70: 0.00766
-      70-80: 0.02439
-      80-90: 0.08292
-      90-100: 0.1619
+      0-10: 1.0
+      10-20: 1.0
+      20-30: 1.0
+      30-40: 1.0
+      40-50: 1.0
+      50-60: 1.0
+      60-70: 1.0
+      70-80: 1.0
+      80-90: 1.0
+      90-100: 1.0
   stage_transition_times:
     exposed:
       dist: LogNormal
