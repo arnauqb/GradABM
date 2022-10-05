@@ -5,7 +5,7 @@ system:
   random_seed: random
 
 #data_path: '@torch_june/worlds/data_london_small.pkl'
-data_path: '/cosma7/data/dp004/dc-quer1/torch_june_worlds/data_london_small.pkl'
+data_path: '/cosma7/data/dp004/dc-quer1/torch_june_worlds/data_london_full.pkl'
 
 save_path: ./example
 
@@ -22,6 +22,21 @@ parameters_to_calibrate:
   model.infection_networks.networks.leisure.log_beta:
     min_value: -3.0
     max_value: 2.0
+      #model.infection_networks.networks.pub.log_beta:
+      #  min_value: -3.0
+      #  max_value: 2.0
+      #model.infection_networks.networks.grocery.log_beta:
+      #  min_value: -3.0
+      #  max_value: 2.0
+      #model.infection_networks.networks.visit.log_beta:
+      #  min_value: -3.0
+      #  max_value: 2.0
+      #model.infection_networks.networks.cinema.log_beta:
+      #  min_value: -3.0
+      #  max_value: 2.0
+      #model.infection_networks.networks.gym.log_beta:
+      #  min_value: -3.0
+      #  max_value: 2.0
   model.infection_networks.networks.university.log_beta:
     min_value: -3.0
     max_value: 2.0
@@ -42,7 +57,7 @@ parameters_to_calibrate:
     max_value: 0.1
 
 timer:
-  total_days: 132 # to 2020-07-04
+  total_days: 124 # to 2020-07-04
   initial_day: '2020-03-01'
   step_duration:
     weekday:
@@ -76,15 +91,15 @@ timer:
       - household
 
 infection_seed:
-  fraction_initial_cases: 0.05
+  fraction_initial_cases: 0.0010
 
 networks:
   household:
-    log_beta: 0.5
+    log_beta: 0.3
   company:
-    log_beta: 0.5
+    log_beta: 0.3
   school:
-    log_beta: 0.5
+    log_beta: 0.3
   pub:
     log_beta: 0.0
   gym:
@@ -96,9 +111,9 @@ networks:
   cinema:
     log_beta: 0.0
   university:
-    log_beta: 0.5
+    log_beta: 0.3
   care_home:
-    log_beta: 0.5
+    log_beta: 0.3
 
 policies:
   interaction:
@@ -107,17 +122,17 @@ policies:
         start_date: 2020-03-16
         end_date: 2020-03-24
         beta_factors:
-          all: 0.7
+          all: 0.8
       2:
         start_date: 2020-03-24
         end_date: 2020-05-11
         beta_factors:
-          all: 0.3
+          all: 0.5
       3:
         start_date: 2020-05-11
         end_date: 2999-01-01
         beta_factors:
-          all: 0.5
+          all: 0.8
     close_venue:
       1:
         start_date: 2020-03-21
@@ -171,37 +186,38 @@ symptoms:
       80-90: 0.9
       90-100: 0.9
     symptomatic:
-      0-10: 0.001
-      10-20: 0.003
-      20-30: 0.012
-      30-40: 0.032
-      40-50: 0.045
-      50-60: 0.102
-      60-70: 0.166
-      70-80: 0.243
-      80-90: 0.273
-      90-100: 0.273
+      0-10: 0.000007
+      10-20: 0.000033
+      20-30: 0.000141
+      30-40: 0.000546
+      40-50: 0.002041
+      50-60: 0.04586
+      60-70: 0.097496
+      70-80: 0.224919
+      80-90: 0.286880
+      90-100: 0.392194
     severe:
-      0-10: 0.06
-      10-20: 0.05
-      20-30: 0.05
-      30-40: 0.05
-      40-50: 0.06
-      50-60: 0.12
-      60-70: 0.27
-      70-80: 0.43
-      80-90: 0.71
-      90-100: 0.71
+      0-10: 1.0
+      10-20: 1.0 
+      20-30: 1.0 
+      30-40: 1.0 
+      40-50: 1.0 
+      50-60: 1.0 
+      60-70: 1.0 
+      70-80: 1.0 
+      80-90: 1.0 
+      90-100: 1.0
     critical:
-      0-10: 0.33
-      10-20: 0.25
-      20-30: 0.5
-      30-40: 0.5
-      40-50: 0.5
-      50-60: 0.69
-      60-70: 0.65
-      70-80: 0.88
-      80-100: 1.0
+      0-10: 1.0
+      10-20: 1.0
+      20-30: 1.0
+      30-40: 1.0
+      40-50: 1.0
+      50-60: 1.0
+      60-70: 1.0
+      70-80: 1.0
+      80-90: 1.0
+      90-100: 1.0
   stage_transition_times:
     exposed:
       dist: LogNormal

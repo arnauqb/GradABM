@@ -605,7 +605,7 @@ def runner(params, devices, verbose):
         #    num_epochs *= 2
         # else:
         #    lr = 1e-4 if params["model_name"].startswith("GradABM") else 1e-4
-        lr = 1e-4
+        lr = 5e-4
 
         """ step 1: training  """
         if train_flag:
@@ -615,7 +615,7 @@ def runner(params, devices, verbose):
                 lr=lr,
                 weight_decay=0.01,
             )
-
+            #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=1000)
             loss_fcn = torch.nn.MSELoss(reduction="none")
             best_loss = np.inf
             losses = []
@@ -638,6 +638,11 @@ def runner(params, devices, verbose):
                     meta = meta.to(devices[0])
                     x = x.to(devices[0])
                     y = y.to(devices[0])
+                    #print("#"*10)
+                    #print("x")
+                    #print(x)
+                    #print("y")
+                    #print(y)
                     param_values = param_model_forward(param_model, params, x, meta)
                     if verbose:
                         if param_values.dim() > 2:
@@ -650,10 +655,10 @@ def runner(params, devices, verbose):
                     predictions = forward_simulator(
                         params, param_values, abm, training_num_steps, counties, devices
                     )
-                    # print("*"*10)
-                    # print(predictions)
-                    # print(y)
-                    # print("*"*10)
+                    #print("*"*10)
+                    #print(predictions)
+                    #print(y)
+                    #print("*"*10)
                     if BENCHMARK_TRAIN:
                         # quit after 1 epoch
                         print("No steps:", training_num_steps)
@@ -666,12 +671,16 @@ def runner(params, devices, verbose):
                     #    devices[0]
                     # )
                     # loss = (loss_weight * loss_fcn(y, predictions)).mean()
+                    #print("#"*10)
+                    #print(predictions)
+                    #print(y)
                     loss = loss_fcn(y, predictions).mean()
                     loss.backward()
                     torch.nn.utils.clip_grad_norm_(param_model.parameters(), CLIP)
                     opt.step()
                     opt.zero_grad(set_to_none=True)
                     epoch_loss += torch.sqrt(loss.detach()).item()
+                #scheduler.step()
                 losses.append(epoch_loss / (batch + 1))  # divide by number of batches
                 df.loc[epi, "loss"] = epoch_loss / (batch + 1)
                 if verbose:
