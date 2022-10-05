@@ -25,7 +25,7 @@ from june import DistrictData, June
 import pdb
 
 BENCHMARK_TRAIN = False
-NUM_EPOCHS_DIFF = 100
+NUM_EPOCHS_DIFF = 1000
 print("---- MAIN IMPORTS SUCCESSFUL -----")
 epsilon = 1e-6
 
@@ -597,7 +597,7 @@ def runner(params, devices, verbose):
         #    num_epochs *= 2
         # else:
         #    lr = 1e-4 if params["model_name"].startswith("GradABM") else 1e-4
-        lr = 1e-4
+        lr = 5e-4
 
         """ step 1: training  """
         if train_flag:
@@ -607,7 +607,7 @@ def runner(params, devices, verbose):
                 lr=lr,
                 weight_decay=0.01,
             )
-            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=100)
+            #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=1000)
             loss_fcn = torch.nn.MSELoss(reduction="none")
             best_loss = np.inf
             losses = []
@@ -647,10 +647,10 @@ def runner(params, devices, verbose):
                     predictions = forward_simulator(
                         params, param_values, abm, training_num_steps, counties, devices
                     )
-                    # print("*"*10)
-                    # print(predictions)
-                    # print(y)
-                    # print("*"*10)
+                    #print("*"*10)
+                    #print(predictions)
+                    #print(y)
+                    #print("*"*10)
                     if BENCHMARK_TRAIN:
                         # quit after 1 epoch
                         print("No steps:", training_num_steps)
@@ -672,7 +672,7 @@ def runner(params, devices, verbose):
                     opt.step()
                     opt.zero_grad(set_to_none=True)
                     epoch_loss += torch.sqrt(loss.detach()).item()
-                scheduler.step()
+                #scheduler.step()
                 losses.append(epoch_loss / (batch + 1))  # divide by number of batches
                 df.loc[epi, "loss"] = epoch_loss / (batch + 1)
                 if verbose:

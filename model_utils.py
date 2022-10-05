@@ -123,6 +123,7 @@ class EmbedAttenSeq(nn.Module):
 
     def forward(self, seqs, metadata):
         # Take last output from GRU
+        seqs = seqs.to(torch.float)
         latent_seqs, encoder_hidden = self.rnn(seqs)
         latent_seqs = self.attn_layer(latent_seqs).sum(0)
         out = self.out_layer(torch.cat([latent_seqs, metadata], dim=1))

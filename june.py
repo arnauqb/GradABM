@@ -72,7 +72,7 @@ class June:
         ret_idcs = np.searchsorted(np.sort(np.unique(district_ids)), district_ids)
         ret = district_nums[ret_idcs]
         self.runner.data["agent"].district = ret
-        data_path = read_path(self.runner._parameters["data_path"])
+        data_path = read_path(self.runner.input_parameters["data_path"])
         pickle.dump(self.runner.data, open(data_path, "wb"))  # save districts
         self.number_of_districts = self.runner.data["agent"].district.unique().shape[0]
         self.districts_map = np.sort(np.unique(district_ids))
@@ -336,38 +336,39 @@ class DistrictData:
         Prepare train and validation dataset
         """
         metadata = self.get_static_metadata()
-        c_seqs_norm, c_ys = self.get_train_data(number_of_weeks, districts_map)
+        X_train, y_train = self.get_train_data(number_of_weeks, districts_map)
+        X_train = torch.tensor(X_train, dtype=torch.float)
+        y_train = torch.tensor(y_train, dtype=torch.float)
+        metadata = torch.tensor(metadata, dtype=torch.float)
         all_counties = np.sort(self.daily_deaths.district_id.unique())
-        min_sequence_length = 5
-        metas, seqs, y, y_mask = [], [], [], []
-        for meta, seq, ys in zip(metadata, c_seqs_norm, c_ys):
-            seq, ys, ys_mask = self.create_window_seqs(seq, ys, min_sequence_length)
-            metas.append(meta)
-            seqs.append(seq[[-1]])
-            y.append(ys[[-1]])
-            y_mask.append(ys_mask[[-1]])
+        #min_sequence_length = 5
+        #metas, seqs, y, y_mask = [], [], [], []
+        #for meta, seq, ys in zip(metadata, c_seqs_norm, c_ys):
+        #    seq, ys, ys_mask = self.create_window_seqs(seq, ys, min_sequence_length)
+        #    metas.append(meta)
+        #    seqs.append(seq[[-1]])
+        #    y.append(ys[[-1]])
+        #    y_mask.append(ys_mask[[-1]])
 
-        all_metas = np.array(metas, dtype="float32")
-        all_county_seqs = torch.cat(seqs, axis=0)
-        all_county_ys = torch.cat(y, axis=0)
-        all_county_y_mask = torch.cat(y_mask, axis=0)
+        #all_metas = np.array(metas, dtype="float32")
+        #all_county_seqs = torch.cat(seqs, axis=0)
+        #all_county_ys = torch.cat(y, axis=0)
+        #all_county_y_mask = torch.cat(y_mask, axis=0)
 
-        counties_train, metas_train, X_train, y_train, y_mask_train = (
-            all_counties,
-            all_metas,
-            all_county_seqs,
-            all_county_ys,
-            all_county_y_mask,
-        )
+        #counties_train, metas_train, X_train, y_train, y_mask_train = (
+        #    all_counties,
+        #    all_metas,
+        #    all_county_seqs,
+        #    all_county_ys,
+        #    all_county_y_mask,
+        #)
         y_train = y_train.unsqueeze(2)
 
         train_dataset = SeqData(
-            counties_train, metas_train, X_train, y_train, y_mask_train
+            all_counties, metadata, X_train, y_train, None
         )
         train_loader = torch.utils.data.DataLoader(
-            train_dataset, batch_size=X_train.shape[0], shuffle=True
+            train_dataset, batch_size=X_train.shape[0], shuffle=False
         )
-
-        assert all_county_seqs.shape[1] == all_county_ys.shape[1]
-        seqlen = all_county_seqs.shape[1]
-        return train_loader, metas_train.shape[1], X_train.shape[2], seqlen
+        seqlen = X_train.shape[1]
+        return train_loader, metadata.shape[1], X_train.shape[2], seqlen
