@@ -71,16 +71,13 @@ class June:
         district_nums = torch.arange(0, np.unique(district_ids).shape[0])
         ret_idcs = np.searchsorted(np.sort(np.unique(district_ids)), district_ids)
         ret = district_nums[ret_idcs]
-        self.runner.data["agent"].district = ret
+        self.runner.data["agent"].district = ret.to(self.device)
         data_path = read_path(self.runner._parameters["data_path"])
         pickle.dump(self.runner.data, open(data_path, "wb"))  # save districts
         self.number_of_districts = self.runner.data["agent"].district.unique().shape[0]
         self.districts_map = np.sort(np.unique(district_ids))
         print("NUMBER OF DISTRICTS")
         print(self.runner.data["agent"].district.unique().shape[0])
-        ret, counts = torch.unique(
-            self.runner.data["agent"].district, return_counts=True
-        )
 
     def _set_param_values(self, param_values):
         param_values = param_values.flatten()
@@ -98,11 +95,11 @@ class June:
         deaths_by_district_timestep = self.runner.data["results"][
             "daily_deaths_by_district"
         ].transpose(0, 1)
-        mask = torch.zeros(deaths_by_district_timestep.shape[1], dtype=torch.long)
+        mask = torch.zeros(deaths_by_district_timestep.shape[1], dtype=torch.long, device=self.device)
         mask[::7] = 1  # take every 7 days.
         mask = mask.to(torch.bool)
         ret = deaths_by_district_timestep[:, mask]
-        ret = torch.diff(ret, prepend=torch.zeros(ret.shape[0], 1), dim=1)
+        ret = torch.diff(ret, prepend=torch.zeros(ret.shape[0], 1, device=self.device), dim=1)
         return ret
 
     def _save_param_values(self, param_values):

@@ -116,10 +116,18 @@ class CalibNNJune(nn.Module):
 
         self.out_layer.apply(init_weights)
         self.min_values = torch.tensor(
-            [parameters_to_calibrate[param]["min_value"] for param in parameters_to_calibrate]
+            [
+                parameters_to_calibrate[param]["min_value"]
+                for param in parameters_to_calibrate
+            ],
+            device=device,
         )
         self.max_values = torch.tensor(
-            [parameters_to_calibrate[param]["max_value"] for param in parameters_to_calibrate]
+            [
+                parameters_to_calibrate[param]["max_value"]
+                for param in parameters_to_calibrate
+            ],
+            device=device,
         )
         self.sigmoid = nn.Sigmoid()
 
