@@ -5,5 +5,5 @@ declare -a params=()
 
 for w in "${weeks[@]}"
 do
-    python -u main.py -d 4 -ew "$w" --seed 1234 -m june -di COVID -id 2020-03-16 -nw 19
+    python -u main.py -d 6 -ew "$w" --seed 1234 -m june -di COVID -id 2020-03-16 -nw 9
 done 

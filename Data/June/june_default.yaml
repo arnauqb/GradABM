@@ -1,11 +1,12 @@
 title: Torch June default configuration file.
 
 system:
-  device: cuda:4
+  device: cuda:6
   random_seed: random
 
 #data_path: '@torch_june/worlds/data_london_small.pkl'
-data_path: '/cosma7/data/dp004/dc-quer1/torch_june_worlds/data_london_full.pkl'
+#data_path: '/cosma7/data/dp004/dc-quer1/torch_june_worlds/data_london_full.pkl'
+data_path: '/cosma7/data/dp004/dc-quer1/torch_june_worlds/data_london_6_districts.pkl'
 
 save_path: ./example
 
@@ -43,22 +44,22 @@ parameters_to_calibrate:
   model.infection_networks.networks.care_home.log_beta:
     min_value: -3.0
     max_value: 2.0
-      #model.policies.interaction_policies.0.beta_factors.all:
-      #  min_value: 0.0
-      #  max_value: 1.0
-      #model.policies.interaction_policies.1.beta_factors.all:
-      #  min_value: 0.0
-      #  max_value: 1.0
-      #model.policies.interaction_policies.2.beta_factors.all:
-      #  min_value: 0.0
-      #  max_value: 1.0
-  fraction_initial_cases:
+  model.policies.interaction_policies.0.beta_factors.all:
     min_value: 0.0
-    max_value: 0.1
+    max_value: 1.0
+  model.policies.interaction_policies.1.beta_factors.all:
+    min_value: 0.0
+    max_value: 1.0
+  model.policies.interaction_policies.2.beta_factors.all:
+    min_value: 0.0
+    max_value: 1.0
+  log_fraction_initial_cases:
+    min_value: -4.0
+    max_value: -2.5
 
 timer:
-  total_days: 124 # to 2020-07-04
-  initial_day: '2020-03-01'
+  total_days: 62 # to 2020-07-04
+  initial_day: '2020-02-15'
   step_duration:
     weekday:
       0: 24
@@ -79,9 +80,6 @@ timer:
       - household
     weekend:
       0:
-      - company
-      - school
-      - university
       - pub 
       - grocery
       - gym
@@ -91,7 +89,7 @@ timer:
       - household
 
 infection_seed:
-  fraction_initial_cases: 0.0010
+  log_fraction_initial_cases: -3.0
 
 networks:
   household:
@@ -134,10 +132,10 @@ policies:
         beta_factors:
           all: 0.8
     close_venue:
-      1:
-        start_date: 2020-03-21
-        end_date: 2020-07-04
-        names: ["pub", "grocery", "visit", "cinema", "gym"]
+        1:
+          start_date: 2020-03-21
+          end_date: 2020-07-04
+          names: ["pub", "grocery", "visit", "cinema", "gym"]
 
 transmission:
   max_infectiousness:

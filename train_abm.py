@@ -605,7 +605,7 @@ def runner(params, devices, verbose):
         #    num_epochs *= 2
         # else:
         #    lr = 1e-4 if params["model_name"].startswith("GradABM") else 1e-4
-        lr = 5e-4
+        lr = 1e-4
 
         """ step 1: training  """
         if train_flag:
@@ -615,8 +615,8 @@ def runner(params, devices, verbose):
                 lr=lr,
                 weight_decay=0.01,
             )
-            #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=1000)
-            loss_fcn = torch.nn.MSELoss(reduction="none")
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=NUM_EPOCHS_DIFF)
+            loss_fcn = torch.nn.MSELoss(reduction="mean")
             best_loss = np.inf
             losses = []
             df = pd.DataFrame(columns=["loss"])
@@ -674,7 +674,12 @@ def runner(params, devices, verbose):
                     #print("#"*10)
                     #print(predictions)
                     #print(y)
-                    loss = loss_fcn(y, predictions).mean()
+                    #y = y[:,:,:].sum()
+                    #predictions = predictions[:,:,:].sum()
+                    print(y.sum(0))
+                    print(predictions.sum(0))
+                    loss = loss_fcn(y.sum(0), predictions.sum(0))
+                    #print(loss)
                     loss.backward()
                     torch.nn.utils.clip_grad_norm_(param_model.parameters(), CLIP)
                     opt.step()

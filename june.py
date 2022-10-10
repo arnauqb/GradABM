@@ -95,12 +95,17 @@ class June:
         deaths_by_district_timestep = self.runner.data["results"][
             "daily_deaths_by_district"
         ].transpose(0, 1)
-        mask = torch.zeros(deaths_by_district_timestep.shape[1], dtype=torch.long, device=self.device)
+        mask = torch.zeros(
+            deaths_by_district_timestep.shape[1], dtype=torch.long, device=self.device
+        )
         mask[::7] = 1  # take every 7 days.
         mask = mask.to(torch.bool)
         ret = deaths_by_district_timestep[:, mask]
-        ret = torch.diff(ret, prepend=torch.zeros(ret.shape[0], 1, device=self.device), dim=1)
         return ret
+        #ret = torch.diff(
+        #    ret, prepend=torch.zeros(ret.shape[0], 1, device=self.device), dim=1
+        #)
+        #return ret
 
     def _save_param_values(self, param_values):
         self.param_values_df.loc[len(self.param_values_df)] = (
@@ -173,21 +178,27 @@ class DistrictData:
             daily_deaths: dataframe with number of deaths per day and district.
             initial_day: When to start counting weeks.
         """
-        deaths_weekly = daily_deaths.copy()
-        deaths_weekly = deaths_weekly.reset_index()
-        deaths_weekly = deaths_weekly.loc[deaths_weekly.date >= initial_day]
-        deaths_weekly["date"] = pd.to_datetime(deaths_weekly["date"]) - pd.to_timedelta(
-            7, unit="d"
-        )
-        deaths_weekly = (
-            deaths_weekly.groupby(["district_id", pd.Grouper(key="date", freq="W-MON")])
-            .sum()
-            .reset_index()
-            .sort_values(["date", "district_id"])
-            .set_index("date")
-        )
-        deaths_weekly.rename(columns={"daily_deaths": "weekly_deaths"}, inplace=True)
-        return deaths_weekly
+        df = daily_deaths.copy()
+        df.index = pd.to_datetime(df.index)
+        df = df.sort_index()
+        df = df.reset_index()
+        df = df.loc[df.date >= initial_day]
+        df["weekly_deaths"] = df.groupby(["district_id"])["daily_deaths"].cumsum()
+        df = df[["date", "district_id", "weekly_deaths"]]
+        df = df.sort_values(["date", "district_id"]).set_index("date")
+        df = df.iloc[::7]
+        #deaths_weekly["date"] = pd.to_datetime(deaths_weekly["date"]) - pd.to_timedelta(
+        #    7, unit="d"
+        #)
+        #deaths_weekly = (
+        #    deaths_weekly.groupby(["district_id", pd.Grouper(key="date", freq="W-MON")])
+        #    .sum()
+        #    .reset_index()
+        #    .sort_values(["date", "district_id"])
+        #    .set_index("date")
+        #)
+        #df.rename(columns={"cumulati": "weekly_deaths"}, inplace=True)
+        return df
 
     def _get_weekly_mobility(
         self, daily_mobility: pd.DataFrame, initial_day: pd.DataFrame
@@ -230,6 +241,7 @@ class DistrictData:
             .iloc[week_1:week_2]
             .values
         )
+        features_deaths = np.zeros((week_2 - week_1) * 7)
         features_deaths = (
             self.weekly_deaths.loc[self.weekly_deaths.district_id == district]
             .drop(columns="district_id")
@@ -335,35 +347,33 @@ class DistrictData:
         metadata = self.get_static_metadata()
         X_train, y_train = self.get_train_data(number_of_weeks, districts_map)
         X_train = torch.tensor(X_train, dtype=torch.float)
-        y_train = torch.tensor(y_train, dtype=torch.float)
+        y_train = torch.tensor(y_train, dtype=torch.float)#.cumsum(1)
         metadata = torch.tensor(metadata, dtype=torch.float)
         all_counties = np.sort(self.daily_deaths.district_id.unique())
-        #min_sequence_length = 5
-        #metas, seqs, y, y_mask = [], [], [], []
-        #for meta, seq, ys in zip(metadata, c_seqs_norm, c_ys):
+        # min_sequence_length = 5
+        # metas, seqs, y, y_mask = [], [], [], []
+        # for meta, seq, ys in zip(metadata, c_seqs_norm, c_ys):
         #    seq, ys, ys_mask = self.create_window_seqs(seq, ys, min_sequence_length)
         #    metas.append(meta)
         #    seqs.append(seq[[-1]])
         #    y.append(ys[[-1]])
         #    y_mask.append(ys_mask[[-1]])
 
-        #all_metas = np.array(metas, dtype="float32")
-        #all_county_seqs = torch.cat(seqs, axis=0)
-        #all_county_ys = torch.cat(y, axis=0)
-        #all_county_y_mask = torch.cat(y_mask, axis=0)
+        # all_metas = np.array(metas, dtype="float32")
+        # all_county_seqs = torch.cat(seqs, axis=0)
+        # all_county_ys = torch.cat(y, axis=0)
+        # all_county_y_mask = torch.cat(y_mask, axis=0)
 
-        #counties_train, metas_train, X_train, y_train, y_mask_train = (
+        # counties_train, metas_train, X_train, y_train, y_mask_train = (
         #    all_counties,
         #    all_metas,
         #    all_county_seqs,
         #    all_county_ys,
         #    all_county_y_mask,
-        #)
+        # )
         y_train = y_train.unsqueeze(2)
 
-        train_dataset = SeqData(
-            all_counties, metadata, X_train, y_train, None
-        )
+        train_dataset = SeqData(all_counties, metadata, X_train, y_train, None)
         train_loader = torch.utils.data.DataLoader(
             train_dataset, batch_size=X_train.shape[0], shuffle=False
         )
