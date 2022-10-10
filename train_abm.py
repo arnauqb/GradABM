@@ -513,6 +513,7 @@ def runner(params, devices, verbose):
                 X_train_dim,
                 seqlen,
             ) = district_data.prepare_data_for_training(
+                june=abm,
                 number_of_weeks=params["number_of_weeks"],
                 districts_map=abm.districts_map,
             )

@@ -5,6 +5,7 @@ import pickle
 import numpy as np
 import yaml
 import pandas as pd
+from datetime import datetime, timedelta
 from torch.nn.utils.rnn import pad_sequence
 from sklearn.preprocessing import StandardScaler
 
@@ -102,10 +103,10 @@ class June:
         mask = mask.to(torch.bool)
         ret = deaths_by_district_timestep[:, mask]
         return ret
-        #ret = torch.diff(
+        # ret = torch.diff(
         #    ret, prepend=torch.zeros(ret.shape[0], 1, device=self.device), dim=1
-        #)
-        #return ret
+        # )
+        # return ret
 
     def _save_param_values(self, param_values):
         self.param_values_df.loc[len(self.param_values_df)] = (
@@ -186,18 +187,6 @@ class DistrictData:
         df["weekly_deaths"] = df.groupby(["district_id"])["daily_deaths"].cumsum()
         df = df[["date", "district_id", "weekly_deaths"]]
         df = df.sort_values(["date", "district_id"]).set_index("date")
-        df = df.iloc[::7]
-        #deaths_weekly["date"] = pd.to_datetime(deaths_weekly["date"]) - pd.to_timedelta(
-        #    7, unit="d"
-        #)
-        #deaths_weekly = (
-        #    deaths_weekly.groupby(["district_id", pd.Grouper(key="date", freq="W-MON")])
-        #    .sum()
-        #    .reset_index()
-        #    .sort_values(["date", "district_id"])
-        #    .set_index("date")
-        #)
-        #df.rename(columns={"cumulati": "weekly_deaths"}, inplace=True)
         return df
 
     def _get_weekly_mobility(
@@ -224,7 +213,7 @@ class DistrictData:
         )
         return data_weekly
 
-    def get_data(self, district: int, week_1: int, week_2: int):
+    def get_data(self, june, district: int, week_1: int, week_2: int):
         """
         Gets data between week_1 and week_2
 
@@ -233,30 +222,51 @@ class DistrictData:
             week_1: first week
             week_2: last week (included)
         """
-        features_mobility = (
-            self.weekly_mobility_data.loc[
-                self.weekly_mobility_data.district_id == district
-            ]
-            .drop(columns="district_id")
-            .iloc[week_1:week_2]
-            .values
-        )
-        features_deaths = np.zeros((week_2 - week_1) * 7)
-        features_deaths = (
-            self.weekly_deaths.loc[self.weekly_deaths.district_id == district]
-            .drop(columns="district_id")
-            .iloc[week_1:week_2]
-            .values.flatten()
-        )
-        if len(features_deaths) == 0:
-            features_deaths = np.zeros(week_2 - week_1)
-        features = np.concatenate(
-            (features_mobility, features_deaths.reshape(-1, 1)), axis=-1
-        )
+        print(district)
+        timer = june.runner.timer
+        n_weeks = week_2 - week_1
+        initial_day = timer.initial_date + timedelta(days=week_1 * 7)
+
+        # mobility data
+        district_data = self.weekly_mobility_data.loc[
+            self.weekly_mobility_data.district_id == district
+        ].drop(columns="district_id")
+        features_mobility = []
+        for n in range(n_weeks):
+            day = initial_day + timedelta(days=n * 7)
+            if day not in district_data.index:
+                features_mobility.append(np.zeros(len(district_data.columns)))
+            else:
+                features_mobility.append(district_data.loc[day].values)
+        print(features_mobility)
+        features_mobility = np.array(features_mobility)
+
+        # deaths data
+        district_data = self.weekly_deaths.loc[
+            self.weekly_deaths.district_id == district
+        ].drop(columns="district_id")
+        features_deaths = []
+        for n in range(n_weeks):
+            day = initial_day + timedelta(days=n * 7)
+            if day not in district_data.index:
+                features_deaths.append(0.0)
+            else:
+                print(district_data.loc[day])
+                features_deaths.append(district_data.loc[day].values[0])
+        features_deaths = np.array(features_deaths)
+        features = features_mobility
+        #features = np.concatenate(
+        #    (features_mobility, features_deaths.reshape(-1, 1)), axis=-1
+        #)
         targets = features_deaths
+        print("--")
+        print(features)
+        print(targets)
+        print(features.dtype)
+        print(targets.dtype)
         return features, targets
 
-    def get_train_data_district(self, district: int, number_of_weeks: int):
+    def get_train_data_district(self, june, district: int, number_of_weeks: int):
         """
         Gets training data for the specified district from the `initial_day`
         to `initial_day + number_of_weeks`.
@@ -265,10 +275,14 @@ class DistrictData:
             district: district id
             number_of_weeks: Number of weeks from initial_day.
         """
-        return self.get_data(district, 0, number_of_weeks)
+        return self.get_data(june, district, 0, number_of_weeks)
 
     def get_test_data_district(
-        self, district: int, number_of_training_weeks: int, number_of_testing_weeks: int
+        self,
+        june,
+        district: int,
+        number_of_training_weeks: int,
+        number_of_testing_weeks: int,
     ):
         """
         Gets testing data
@@ -278,18 +292,19 @@ class DistrictData:
             number_of_weeks: Number of weeks from initial_day.
         """
         return self.get_data(
+            june,
             district,
             number_of_training_weeks + 1,
             number_of_training_weeks + number_of_testing_weeks + 1,
         )
 
-    def get_train_data(self, number_of_weeks: int, districts):
+    def get_train_data(self, june, number_of_weeks: int, districts):
         # districts = np.sort(self.weekly_mobility_data.district_id.unique())
         features = []
         targets = []
         for district in districts:
             district_features, district_targets = self.get_train_data_district(
-                district, number_of_weeks
+                june, district, number_of_weeks
             )
             district_features = StandardScaler().fit_transform(district_features)
             features.append(district_features)
@@ -340,37 +355,16 @@ class DistrictData:
 
         return seqs, ys, mask_ys
 
-    def prepare_data_for_training(self, number_of_weeks: int, districts_map):
+    def prepare_data_for_training(self, june, number_of_weeks: int, districts_map):
         """
         Prepare train and validation dataset
         """
         metadata = self.get_static_metadata()
-        X_train, y_train = self.get_train_data(number_of_weeks, districts_map)
+        X_train, y_train = self.get_train_data(june, number_of_weeks, districts_map)
         X_train = torch.tensor(X_train, dtype=torch.float)
-        y_train = torch.tensor(y_train, dtype=torch.float)#.cumsum(1)
+        y_train = torch.tensor(y_train, dtype=torch.float)
         metadata = torch.tensor(metadata, dtype=torch.float)
         all_counties = np.sort(self.daily_deaths.district_id.unique())
-        # min_sequence_length = 5
-        # metas, seqs, y, y_mask = [], [], [], []
-        # for meta, seq, ys in zip(metadata, c_seqs_norm, c_ys):
-        #    seq, ys, ys_mask = self.create_window_seqs(seq, ys, min_sequence_length)
-        #    metas.append(meta)
-        #    seqs.append(seq[[-1]])
-        #    y.append(ys[[-1]])
-        #    y_mask.append(ys_mask[[-1]])
-
-        # all_metas = np.array(metas, dtype="float32")
-        # all_county_seqs = torch.cat(seqs, axis=0)
-        # all_county_ys = torch.cat(y, axis=0)
-        # all_county_y_mask = torch.cat(y_mask, axis=0)
-
-        # counties_train, metas_train, X_train, y_train, y_mask_train = (
-        #    all_counties,
-        #    all_metas,
-        #    all_county_seqs,
-        #    all_county_ys,
-        #    all_county_y_mask,
-        # )
         y_train = y_train.unsqueeze(2)
 
         train_dataset = SeqData(all_counties, metadata, X_train, y_train, None)
