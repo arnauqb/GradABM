@@ -249,7 +249,6 @@ class DistrictData:
             if day not in district_data.index:
                 features_deaths.append(0.0)
             else:
-                print(district_data.loc[day])
                 features_deaths.append(district_data.loc[day].values[0])
         features_deaths = np.array(features_deaths)
         features = features_mobility
