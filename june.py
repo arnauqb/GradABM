@@ -222,7 +222,6 @@ class DistrictData:
             week_1: first week
             week_2: last week (included)
         """
-        print(district)
         timer = june.runner.timer
         n_weeks = week_2 - week_1
         initial_day = timer.initial_date + timedelta(days=week_1 * 7)
@@ -238,7 +237,6 @@ class DistrictData:
                 features_mobility.append(np.zeros(len(district_data.columns)))
             else:
                 features_mobility.append(district_data.loc[day].values)
-        print(features_mobility)
         features_mobility = np.array(features_mobility)
 
         # deaths data
@@ -255,15 +253,7 @@ class DistrictData:
                 features_deaths.append(district_data.loc[day].values[0])
         features_deaths = np.array(features_deaths)
         features = features_mobility
-        #features = np.concatenate(
-        #    (features_mobility, features_deaths.reshape(-1, 1)), axis=-1
-        #)
         targets = features_deaths
-        print("--")
-        print(features)
-        print(targets)
-        print(features.dtype)
-        print(targets.dtype)
         return features, targets
 
     def get_train_data_district(self, june, district: int, number_of_weeks: int):
