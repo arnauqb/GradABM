@@ -25,7 +25,7 @@ from june import DistrictData, June
 import pdb
 
 BENCHMARK_TRAIN = False
-NUM_EPOCHS_DIFF = 1000
+NUM_EPOCHS_DIFF = 500
 print("---- MAIN IMPORTS SUCCESSFUL -----")
 epsilon = 1e-6
 
@@ -606,7 +606,7 @@ def runner(params, devices, verbose):
         #    num_epochs *= 2
         # else:
         #    lr = 1e-4 if params["model_name"].startswith("GradABM") else 1e-4
-        lr = 1e-4
+        lr = 5e-4
 
         """ step 1: training  """
         if train_flag:
@@ -695,7 +695,7 @@ def runner(params, devices, verbose):
                 if torch.isnan(loss):
                     break
                 """ save best model """
-                df.to_csv("./losses.csv", index=False)
+                df.to_csv("./losses2.csv", index=False)
                 if epoch_loss < best_loss:
                     if params["joint"]:
                         save_model(

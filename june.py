@@ -112,7 +112,7 @@ class June:
         self.param_values_df.loc[len(self.param_values_df)] = (
             param_values.flatten().detach().cpu().numpy()
         )
-        self.param_values_df.to_csv("./param_values.csv", index=False)
+        self.param_values_df.to_csv("./param_values2.csv", index=False)
 
     def step(self, param_values):
         self._set_param_values(param_values)

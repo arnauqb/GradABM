@@ -1,12 +1,12 @@
 title: Torch June default configuration file.
 
 system:
-  device: cpu
+  device: cuda:4
   random_seed: random
 
-data_path: '@torch_june/worlds/data_london_small.pkl'
-#data_path: '/cosma7/data/dp004/dc-quer1/torch_june_worlds/data_london_full.pkl'
-#data_path: '/cosma7/data/dp004/dc-quer1/torch_june_worlds/data_london_6_districts.pkl'
+    #data_path: '@torch_june/worlds/data_london_small.pkl'
+    #data_path: '/cosma7/data/dp004/dc-quer1/torch_june_worlds/data_london_full.pkl'
+data_path: '/cosma7/data/dp004/dc-quer1/torch_june_worlds/data_london_6_districts.pkl'
 
 save_path: ./example
 
@@ -40,7 +40,7 @@ parameters_to_calibrate:
       #  max_value: 2.0
   model.infection_networks.networks.university.log_beta:
     min_value: -3.0
-    max_value: 2.0
+    max_value: -1.0
   model.infection_networks.networks.care_home.log_beta:
     min_value: -3.0
     max_value: 2.0
@@ -54,12 +54,12 @@ parameters_to_calibrate:
     min_value: 0.0
     max_value: 1.0
   log_fraction_initial_cases:
-    min_value: -4.0
-    max_value: -2.5
+    min_value: -3.4
+    max_value: -3.6
 
 timer:
-  total_days: 62 # to 2020-07-04
-  initial_day: '2020-02-15'
+  total_days: 76 # to 2020-07-04
+  initial_day: '2020-03-01'
   step_duration:
     weekday:
       0: 24
@@ -89,7 +89,7 @@ timer:
       - household
 
 infection_seed:
-  log_fraction_initial_cases: -3.0
+  log_fraction_initial_cases: -3.5
 
 networks:
   household:
