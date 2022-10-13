@@ -4,9 +4,9 @@ system:
   device: cpu
   random_seed: random
 
-data_path: '@torch_june/worlds/data_london_small.pkl'
+data_path: '@torch_june/worlds/data_london_1_districts.pkl'
 #data_path: '/cosma7/data/dp004/dc-quer1/torch_june_worlds/data_london_full.pkl'
-#data_path: '/cosma7/data/dp004/dc-quer1/torch_june_worlds/data_london_6_districts.pkl'
+#data_path: '/cosma7/data/dp004/dc-quer1/torch_june_worlds/data_london_1_districts.pkl'
 
 save_path: ./example
 

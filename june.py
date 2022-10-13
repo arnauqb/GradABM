@@ -12,13 +12,14 @@ from sklearn.preprocessing import StandardScaler
 from paths import default_data_path
 from torch_june import Runner
 from torch_june.utils import read_path
-from model_utils import SeqData
+from model_utils import SeqDataJune
 
 default_june_data_path = default_data_path / "June"
 default_june_config_path = default_june_data_path / "june_default.yaml"
 default_daily_deaths_filename = default_june_data_path / "deaths_by_lad.csv"
 default_mobility_data_filename = default_june_data_path / "london_mobility_data.csv"
 default_area_to_district_filename = default_june_data_path / "area_district.csv"
+default_seroprevalence_filename = default_june_data_path / "seroprevalence.csv"
 
 
 def get_attribute(base, path):
@@ -103,10 +104,6 @@ class June:
         mask = mask.to(torch.bool)
         ret = deaths_by_district_timestep[:, mask]
         return ret
-        # ret = torch.diff(
-        #    ret, prepend=torch.zeros(ret.shape[0], 1, device=self.device), dim=1
-        # )
-        # return ret
 
     def _save_param_values(self, param_values):
         self.param_values_df.loc[len(self.param_values_df)] = (
@@ -114,12 +111,27 @@ class June:
         )
         self.param_values_df.to_csv("./param_values.csv", index=False)
 
+    def _get_seroprevalence(self, results):
+        ret = torch.zeros(4)
+        for i, age in enumerate(("25", "45", "65", "100")):
+            cases_by_age = results[f"cases_by_age_{age}"][-1]
+            population_by_age = self.runner.population_by_age[i + 1]
+            # this ignores deaths correction...
+            seroprev = cases_by_age / population_by_age
+            ret[i] = seroprev
+        ret = ret 
+        ret = ret.reshape(1,-1)
+        return ret
+
     def step(self, param_values):
         self._set_param_values(param_values)
         self._save_param_values(param_values)
         results, _ = self.runner()
-        predictions = self._get_deaths_per_week()
-        return predictions
+        predictions_deaths = self._get_deaths_per_week()
+        predictions_deaths = predictions_deaths
+        predictions_deaths = predictions_deaths.unsqueeze(2)
+        predictions_seroprev = self._get_seroprevalence(results)
+        return predictions_deaths, predictions_seroprev
 
 
 class DistrictData:
@@ -129,6 +141,7 @@ class DistrictData:
         daily_deaths: pd.DataFrame,
         mobility_data: pd.DataFrame,
         area_to_district: pd.DataFrame,
+        seroprevalence: pd.DataFrame,
     ):
         """
         Handles data at the district level, like deaths per day or mobility data.
@@ -152,6 +165,7 @@ class DistrictData:
             self.daily_mobility_data, initial_day
         )
         self.area_to_district = area_to_district
+        self.seroprevalence = seroprevalence.values.flatten()
 
     @classmethod
     def from_file(
@@ -160,15 +174,18 @@ class DistrictData:
         daily_deaths_filename: str = default_daily_deaths_filename,
         mobility_data_filename: str = default_mobility_data_filename,
         area_to_district_filename: str = default_area_to_district_filename,
+        seroprevalence_filename: str = default_seroprevalence_filename,
     ):
         daily_deaths = pd.read_csv(daily_deaths_filename)
         mobility_data = pd.read_csv(mobility_data_filename)
         area_to_district = pd.read_csv(area_to_district_filename, index_col=0)
+        seroprevalence = pd.read_csv(seroprevalence_filename)
         return cls(
             initial_day=initial_day,
             daily_deaths=daily_deaths,
             mobility_data=mobility_data,
             area_to_district=area_to_district,
+            seroprevalence=seroprevalence,
         )
 
     def _get_weekly_deaths(self, daily_deaths: pd.DataFrame, initial_day: pd.DataFrame):
@@ -298,8 +315,11 @@ class DistrictData:
             district_features = StandardScaler().fit_transform(district_features)
             features.append(district_features)
             targets.append(district_targets)
-
-        return np.array(features), np.array(targets)
+        targets = {
+            "deaths": torch.tensor(np.array(targets), dtype=torch.float),
+            "seroprevalence": torch.tensor(self.seroprevalence, dtype=torch.float),
+        }
+        return np.array(features), targets
 
     def get_static_metadata(self):
         """
@@ -351,12 +371,17 @@ class DistrictData:
         metadata = self.get_static_metadata()
         X_train, y_train = self.get_train_data(june, number_of_weeks, districts_map)
         X_train = torch.tensor(X_train, dtype=torch.float)
-        y_train = torch.tensor(y_train, dtype=torch.float)
         metadata = torch.tensor(metadata, dtype=torch.float)
         all_counties = np.sort(self.daily_deaths.district_id.unique())
-        y_train = y_train.unsqueeze(2)
+        y_train["deaths"] = y_train["deaths"].unsqueeze(2)
 
-        train_dataset = SeqData(all_counties, metadata, X_train, y_train, None)
+        train_dataset = SeqDataJune(
+            all_counties,
+            metadata,
+            X_train,
+            y_deaths=y_train["deaths"],
+            y_seroprev=y_train["seroprevalence"],
+        )
         train_loader = torch.utils.data.DataLoader(
             train_dataset, batch_size=X_train.shape[0], shuffle=False
         )
