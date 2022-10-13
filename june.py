@@ -109,7 +109,7 @@ class June:
         self.param_values_df.loc[len(self.param_values_df)] = (
             param_values.flatten().detach().cpu().numpy()
         )
-        self.param_values_df.to_csv("./param_values.csv", index=False)
+        self.param_values_df.to_csv("./param_values2.csv", index=False)
 
     def _get_seroprevalence(self, results):
         ret = torch.zeros(4)
