@@ -674,8 +674,8 @@ def runner(params, devices, verbose):
                     y_deaths = y_deaths  # / (y_deaths.sum(0)[-1])
                     # print(predictions_deaths)
                     # print(y_deaths)
-                    predictions_seroprev = 100 * predictions_seroprev
-                    y_seroprev = 100 * y_seroprev
+                    predictions_seroprev = predictions_seroprev
+                    y_seroprev = y_seroprev
                     # print("deaths")
                     # print(y_deaths.sum(0))
                     # print(predictions_deaths.sum(0))
