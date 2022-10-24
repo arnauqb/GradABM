@@ -19,7 +19,7 @@ default_june_config_path = default_june_data_path / "june_default.yaml"
 default_daily_deaths_filename = default_june_data_path / "deaths_by_lad.csv"
 default_mobility_data_filename = default_june_data_path / "london_mobility_data.csv"
 default_area_to_district_filename = default_june_data_path / "area_district.csv"
-default_seroprevalence_filename = default_june_data_path / "seroprevalence.csv"
+default_seroprevalence_filename = default_june_data_path / "seroprevalence_ward.csv"
 
 
 def get_attribute(base, path):
@@ -112,14 +112,14 @@ class June:
         self.param_values_df.to_csv("./param_values.csv", index=False)
 
     def _get_seroprevalence(self, results):
-        ret = torch.zeros(5, device=results["cases_per_timestep"].device)
-        for i, age in enumerate(("18", "25", "45", "65", "100")):
+        ret = torch.zeros(8, device=results["cases_per_timestep"].device)
+        for i, age in enumerate(("18", "25", "35", "45", "55", "65", "75", "100")):
             cases_by_age = results[f"cases_by_age_{age}"][-1]
             population_by_age = self.runner.population_by_age[i]
             # this ignores deaths correction...
-            seroprev = cases_by_age / population_by_age.to(cases_by_age.device)
+            seroprev = cases_by_age / population_by_age.to(cases_by_age.device) * 100
             ret[i] = seroprev
-        ret = ret 
+        ret = ret
         return ret
 
     def step(self, param_values):
@@ -177,7 +177,7 @@ class DistrictData:
         daily_deaths = pd.read_csv(daily_deaths_filename)
         mobility_data = pd.read_csv(mobility_data_filename)
         area_to_district = pd.read_csv(area_to_district_filename, index_col=0)
-        seroprevalence = pd.read_csv(seroprevalence_filename)
+        seroprevalence = pd.read_csv(seroprevalence_filename)["middle"]
         return cls(
             initial_day=initial_day,
             daily_deaths=daily_deaths,
