@@ -25,7 +25,7 @@ from june import DistrictData, June
 import pdb
 
 BENCHMARK_TRAIN = False
-NUM_EPOCHS_DIFF = 500
+NUM_EPOCHS_DIFF = 100
 print("---- MAIN IMPORTS SUCCESSFUL -----")
 epsilon = 1e-6
 
@@ -607,7 +607,7 @@ def runner(params, devices, verbose):
         #    num_epochs *= 2
         # else:
         #    lr = 1e-4 if params["model_name"].startswith("GradABM") else 1e-4
-        lr = 5e-4
+        lr = 1e-4
 
         """ step 1: training  """
         if train_flag:
@@ -620,7 +620,7 @@ def runner(params, devices, verbose):
             scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
                 opt, T_max=NUM_EPOCHS_DIFF
             )
-            loss_fcn = torch.nn.MSELoss(reduction="mean")
+            loss_fcn = torch.nn.MSELoss(reduction="sum")
             best_loss = np.inf
             losses = []
             df = pd.DataFrame(columns=["loss"])
@@ -643,8 +643,6 @@ def runner(params, devices, verbose):
                     # forward pass param model
                     meta = meta.to(devices[0])
                     x = x.to(devices[0])
-                    y_deaths = y_deaths.to(devices[0])
-                    y_seroprev = y_seroprev.to(devices[0])
                     param_values = param_model_forward(param_model, params, x, meta)
                     if verbose:
                         if param_values.dim() > 2:
@@ -657,6 +655,8 @@ def runner(params, devices, verbose):
                     predictions_deaths, predictions_seroprev = forward_simulator(
                         params, param_values, abm, training_num_steps, counties, devices
                     )
+                    y_deaths = y_deaths.to(predictions_deaths.device)
+                    y_seroprev = y_seroprev.to(predictions_deaths.device)
                     # print("*"*10)
                     # print(predictions)
                     # print(y)
@@ -670,23 +670,34 @@ def runner(params, devices, verbose):
                     if verbose:
                         print(torch.cat((y, predictions), 2))
                     # normalize
-                    predictions_deaths = predictions_deaths / y_deaths.sum()
-                    y_deaths = y_deaths / y_deaths.sum()
-                    predictions_seroprev = predictions_seroprev / y_seroprev.sum()
-                    y_seroprev = y_seroprev/ y_seroprev.sum()
-                    #print(y_deaths)
-                    #print(predictions_deaths)
-                    #print(y_seroprev)
-                    #print(predictions_seroprev)
+                    predictions_deaths = predictions_deaths  # / (y_deaths.sum(0)[-1])
+                    y_deaths = y_deaths  # / (y_deaths.sum(0)[-1])
+                    # print(predictions_deaths)
+                    # print(y_deaths)
+                    predictions_seroprev = 100 * predictions_seroprev
+                    y_seroprev = 100 * y_seroprev
+                    # print("deaths")
+                    # print(y_deaths.sum(0))
+                    # print(predictions_deaths.sum(0))
+                    # print("seroprev")
+                    # print(y_seroprev[0,:])
+                    # print(predictions_seroprev)
                     loss = loss_fcn(y_deaths, predictions_deaths)
-                    loss += loss_fcn(y_seroprev, predictions_seroprev)
+                    print(loss)
+                    print(y_seroprev[0,:])
+                    print(predictions_seroprev)
+                    loss_seroprev = 1_000 * loss_fcn(
+                        y_seroprev[0, :], predictions_seroprev
+                    )
+                    print(loss_seroprev)
+                    loss += loss_seroprev
                     # print(loss)
                     loss.backward()
                     torch.nn.utils.clip_grad_norm_(param_model.parameters(), CLIP)
                     opt.step()
                     opt.zero_grad(set_to_none=True)
                     epoch_loss += torch.sqrt(loss.detach()).item()
-                # scheduler.step()
+                #scheduler.step()
                 losses.append(epoch_loss / (batch + 1))  # divide by number of batches
                 df.loc[epi, "loss"] = epoch_loss / (batch + 1)
                 if verbose:
@@ -695,7 +706,7 @@ def runner(params, devices, verbose):
                 if torch.isnan(loss):
                     break
                 """ save best model """
-                df.to_csv("./losses2.csv", index=False)
+                df.to_csv("./losses.csv", index=False)
                 if epoch_loss < best_loss:
                     if params["joint"]:
                         save_model(

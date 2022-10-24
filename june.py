@@ -109,18 +109,17 @@ class June:
         self.param_values_df.loc[len(self.param_values_df)] = (
             param_values.flatten().detach().cpu().numpy()
         )
-        self.param_values_df.to_csv("./param_values2.csv", index=False)
+        self.param_values_df.to_csv("./param_values.csv", index=False)
 
     def _get_seroprevalence(self, results):
-        ret = torch.zeros(4)
-        for i, age in enumerate(("25", "45", "65", "100")):
+        ret = torch.zeros(5, device=results["cases_per_timestep"].device)
+        for i, age in enumerate(("18", "25", "45", "65", "100")):
             cases_by_age = results[f"cases_by_age_{age}"][-1]
-            population_by_age = self.runner.population_by_age[i + 1]
+            population_by_age = self.runner.population_by_age[i]
             # this ignores deaths correction...
-            seroprev = cases_by_age / population_by_age
+            seroprev = cases_by_age / population_by_age.to(cases_by_age.device)
             ret[i] = seroprev
         ret = ret 
-        ret = ret.reshape(1,-1)
         return ret
 
     def step(self, param_values):
@@ -128,7 +127,6 @@ class June:
         self._save_param_values(param_values)
         results, _ = self.runner()
         predictions_deaths = self._get_deaths_per_week()
-        predictions_deaths = predictions_deaths
         predictions_deaths = predictions_deaths.unsqueeze(2)
         predictions_seroprev = self._get_seroprevalence(results)
         return predictions_deaths, predictions_seroprev
