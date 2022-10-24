@@ -38,6 +38,15 @@ parameters_to_calibrate:
   model.infection_networks.networks.gym.log_beta:
     min_value: -2.5
     max_value: 2.0
+  model.infection_networks.networks.care_visits.log_beta:
+    min_value: -2.5
+    max_value: 2.0
+  model.infection_networks.networks.cinema.log_beta:
+    min_value: -2.5
+    max_value: 2.0
+  model.infection_networks.networks.gym.log_beta:
+    min_value: -2.5
+    max_value: 2.0
   model.infection_networks.networks.university.log_beta:
     min_value: -2.5
     max_value: 3.0
@@ -455,3 +464,23 @@ leisure:
         51-66: 0.1405
         66-86: 0.1145
         86-100: 0.075
+
+  care_visits:
+    weekday:
+      male:
+        0-65: 0.0
+        65-75: 0.25
+        75-100: 0.5
+      female:
+        0-65: 0.0
+        65-75: 0.25
+        75-100: 0.5
+    weekend:
+      male:
+        0-65: 0.0
+        65-75: 0.25
+        75-100: 0.5
+      female:
+        0-65: 0.0
+        65-75: 0.25
+        75-100: 0.5
