@@ -25,7 +25,7 @@ from june import DistrictData, June
 import pdb
 
 BENCHMARK_TRAIN = False
-NUM_EPOCHS_DIFF = 100
+NUM_EPOCHS_DIFF = 1000
 print("---- MAIN IMPORTS SUCCESSFUL -----")
 epsilon = 1e-6
 
@@ -607,7 +607,7 @@ def runner(params, devices, verbose):
         #    num_epochs *= 2
         # else:
         #    lr = 1e-4 if params["model_name"].startswith("GradABM") else 1e-4
-        lr = 1e-4
+        lr = 3e-4
 
         """ step 1: training  """
         if train_flag:
@@ -620,7 +620,7 @@ def runner(params, devices, verbose):
             scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
                 opt, T_max=NUM_EPOCHS_DIFF
             )
-            loss_fcn = torch.nn.MSELoss(reduction="sum")
+            loss_fcn = torch.nn.MSELoss(reduction="mean")
             best_loss = np.inf
             losses = []
             df = pd.DataFrame(columns=["loss"])
@@ -671,7 +671,7 @@ def runner(params, devices, verbose):
                         print(torch.cat((y, predictions), 2))
                     # normalize
                     predictions_deaths = predictions_deaths  # / (y_deaths.sum(0)[-1])
-                    y_deaths = y_deaths  # / (y_deaths.sum(0)[-1])
+                    y_deaths = y_deaths # / (y_deaths.sum(0)[-1])
                     # print(predictions_deaths)
                     # print(y_deaths)
                     predictions_seroprev = predictions_seroprev
@@ -686,7 +686,7 @@ def runner(params, devices, verbose):
                     print(loss)
                     print(y_seroprev[0,:])
                     print(predictions_seroprev)
-                    loss_seroprev = 1_000 * loss_fcn(
+                    loss_seroprev = 1000 * loss_fcn(
                         y_seroprev[0, :], predictions_seroprev
                     )
                     print(loss_seroprev)
@@ -697,7 +697,7 @@ def runner(params, devices, verbose):
                     opt.step()
                     opt.zero_grad(set_to_none=True)
                     epoch_loss += torch.sqrt(loss.detach()).item()
-                #scheduler.step()
+                scheduler.step()
                 losses.append(epoch_loss / (batch + 1))  # divide by number of batches
                 df.loc[epi, "loss"] = epoch_loss / (batch + 1)
                 if verbose:

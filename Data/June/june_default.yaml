@@ -1,58 +1,58 @@
 title: Torch June default configuration file.
 
 system:
-  device: cpu
+  device: cuda:6
   random_seed: random
 
-data_path: '@torch_june/worlds/data_london_1_districts.pkl'
+    #data_path: '@torch_june/worlds/data_london_1_districts.pkl'
     #data_path: '/cosma7/data/dp004/dc-quer1/torch_june_worlds/data_london_full.pkl'
-    #data_path: '/cosma7/data/dp004/dc-quer1/torch_june_worlds/data_london_6_districts.pkl'
+data_path: '/cosma7/data/dp004/dc-quer1/torch_june_worlds/data_london_6_districts.pkl'
 
 save_path: ./example
 
 parameters_to_calibrate:
   model.infection_networks.networks.household.log_beta:
     min_value: -2.5
-    max_value: 2.0
+    max_value: 3.0
   model.infection_networks.networks.school.log_beta:
     min_value: -2.5
-    max_value: 2.0
+    max_value: 3.0
   model.infection_networks.networks.company.log_beta:
     min_value: -2.5
-    max_value: 2.0
-  model.infection_networks.networks.leisure.log_beta:
+    max_value: 3.0
+      #model.infection_networks.networks.leisure.log_beta:
+      #  min_value: -2.5
+      #  max_value: 3.0
+  model.infection_networks.networks.pub.log_beta:
     min_value: -2.5
     max_value: 2.0
-      #model.infection_networks.networks.pub.log_beta:
-      #  min_value: -2.5
-      #  max_value: 2.0
-      #model.infection_networks.networks.grocery.log_beta:
-      #  min_value: -2.5
-      #  max_value: 2.0
-      #model.infection_networks.networks.visit.log_beta:
-      #  min_value: -2.5
-      #  max_value: 2.0
-      #model.infection_networks.networks.cinema.log_beta:
-      #  min_value: -2.5
-      #  max_value: 2.0
-      #model.infection_networks.networks.gym.log_beta:
-      #  min_value: -2.5
-      #  max_value: 2.0
+  model.infection_networks.networks.grocery.log_beta:
+    min_value: -2.5
+    max_value: 2.0
+  model.infection_networks.networks.visit.log_beta:
+    min_value: -2.5
+    max_value: 2.0
+  model.infection_networks.networks.cinema.log_beta:
+    min_value: -2.5
+    max_value: 2.0
+  model.infection_networks.networks.gym.log_beta:
+    min_value: -2.5
+    max_value: 2.0
   model.infection_networks.networks.university.log_beta:
     min_value: -2.5
-    max_value: 2.0
+    max_value: 3.0
   model.infection_networks.networks.care_home.log_beta:
     min_value: -2.5
-    max_value: 2.0
-  model.policies.interaction_policies.0.beta_factors.all:
-    min_value: 0.0
-    max_value: 1.0
-  model.policies.interaction_policies.1.beta_factors.all:
-    min_value: 0.0
-    max_value: 1.0
-  model.policies.interaction_policies.2.beta_factors.all:
-    min_value: 0.0
-    max_value: 1.0
+    max_value: 3.0
+      #model.policies.interaction_policies.0.beta_factors.all:
+      #  min_value: 0.0
+      #  max_value: 1.0
+      #model.policies.interaction_policies.1.beta_factors.all:
+      #  min_value: 0.0
+      #  max_value: 1.0
+      #model.policies.interaction_policies.2.beta_factors.all:
+      #  min_value: 0.0
+      #  max_value: 1.0
   log_fraction_initial_cases:
     min_value: -4.0
     max_value: -2.5
@@ -135,7 +135,7 @@ policies:
         1:
           start_date: 2020-03-21
           end_date: 2020-07-04
-          names: ["school", "university", "pub", "grocery", "visit", "cinema", "gym"]
+          names: ["company", "school", "university", "pub", "grocery", "visit", "cinema", "gym"]
 
 transmission:
   max_infectiousness:
