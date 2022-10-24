@@ -690,7 +690,7 @@ def runner(params, devices, verbose):
                         y_seroprev[0, :], predictions_seroprev
                     )
                     print(loss_seroprev)
-                    loss += loss_seroprev
+                    #loss += loss_seroprev
                     # print(loss)
                     loss.backward()
                     torch.nn.utils.clip_grad_norm_(param_model.parameters(), CLIP)

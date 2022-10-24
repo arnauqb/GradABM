@@ -20,24 +20,24 @@ parameters_to_calibrate:
   model.infection_networks.networks.company.log_beta:
     min_value: -2.5
     max_value: 2.0
-      #  model.infection_networks.networks.leisure.log_beta:
-      #min_value: -2.5
-      #max_value: 2.0
-  model.infection_networks.networks.pub.log_beta:
+  model.infection_networks.networks.leisure.log_beta:
     min_value: -2.5
     max_value: 2.0
-  model.infection_networks.networks.grocery.log_beta:
-    min_value: -2.5
-    max_value: 2.0
-  model.infection_networks.networks.visit.log_beta:
-    min_value: -2.5
-    max_value: 2.0
-  model.infection_networks.networks.cinema.log_beta:
-    min_value: -2.5
-    max_value: 2.0
-  model.infection_networks.networks.gym.log_beta:
-    min_value: -2.5
-    max_value: 2.0
+      #model.infection_networks.networks.pub.log_beta:
+      #  min_value: -2.5
+      #  max_value: 2.0
+      #model.infection_networks.networks.grocery.log_beta:
+      #  min_value: -2.5
+      #  max_value: 2.0
+      #model.infection_networks.networks.visit.log_beta:
+      #  min_value: -2.5
+      #  max_value: 2.0
+      #model.infection_networks.networks.cinema.log_beta:
+      #  min_value: -2.5
+      #  max_value: 2.0
+      #model.infection_networks.networks.gym.log_beta:
+      #  min_value: -2.5
+      #  max_value: 2.0
   model.infection_networks.networks.university.log_beta:
     min_value: -2.5
     max_value: 2.0
