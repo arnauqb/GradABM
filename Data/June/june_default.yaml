@@ -1,73 +1,67 @@
 title: Torch June default configuration file.
 
 system:
-  device: cuda:6
+  device: cuda:5
   random_seed: random
 
     #data_path: '@torch_june/worlds/data_london_1_districts.pkl'
-    #data_path: '/cosma7/data/dp004/dc-quer1/torch_june_worlds/data_london_full.pkl'
-data_path: '/cosma7/data/dp004/dc-quer1/torch_june_worlds/data_london_6_districts.pkl'
+data_path: '/cosma7/data/dp004/dc-quer1/torch_june_worlds/data_north_london.pkl'
+    #data_path: '/cosma7/data/dp004/dc-quer1/torch_june_worlds/data_london_6_districts.pkl'
 
 save_path: ./example
 
 parameters_to_calibrate:
   model.infection_networks.networks.household.log_beta:
-    min_value: -2.5
-    max_value: 3.0
+    min_value: -1.0
+    max_value: 2.0
   model.infection_networks.networks.school.log_beta:
-    min_value: -2.5
-    max_value: 3.0
+    min_value: -1.0
+    max_value: 1.0
   model.infection_networks.networks.company.log_beta:
-    min_value: -2.5
-    max_value: 3.0
-      #model.infection_networks.networks.leisure.log_beta:
+    min_value: -1.0
+    max_value: 1.0
+  model.infection_networks.networks.leisure.log_beta:
+    min_value: -1.0
+    max_value: 2.0
+      #model.infection_networks.networks.pub.log_beta:
       #  min_value: -2.5
-      #  max_value: 3.0
-  model.infection_networks.networks.pub.log_beta:
-    min_value: -2.5
-    max_value: 2.0
-  model.infection_networks.networks.grocery.log_beta:
-    min_value: -2.5
-    max_value: 2.0
-  model.infection_networks.networks.visit.log_beta:
-    min_value: -2.5
-    max_value: 2.0
-  model.infection_networks.networks.cinema.log_beta:
-    min_value: -2.5
-    max_value: 2.0
-  model.infection_networks.networks.gym.log_beta:
-    min_value: -2.5
-    max_value: 2.0
-  model.infection_networks.networks.care_visits.log_beta:
-    min_value: -2.5
-    max_value: 2.0
-  model.infection_networks.networks.cinema.log_beta:
-    min_value: -2.5
-    max_value: 2.0
-  model.infection_networks.networks.gym.log_beta:
-    min_value: -2.5
+      #  max_value: 2.0
+      #model.infection_networks.networks.grocery.log_beta:
+      #  min_value: -2.5
+      #  max_value: 2.0
+      #model.infection_networks.networks.visit.log_beta:
+      #  min_value: -2.5
+      #  max_value: 2.0
+      #model.infection_networks.networks.cinema.log_beta:
+      #  min_value: -2.5
+      #  max_value: 2.0
+      #model.infection_networks.networks.gym.log_beta:
+      #  min_value: -2.5
+      #  max_value: 2.0
+  model.infection_networks.networks.care_visit.log_beta:
+    min_value: -1.0
     max_value: 2.0
   model.infection_networks.networks.university.log_beta:
-    min_value: -2.5
-    max_value: 3.0
+    min_value: -1.0
+    max_value: 2.0
   model.infection_networks.networks.care_home.log_beta:
-    min_value: -2.5
-    max_value: 3.0
-      #model.policies.interaction_policies.0.beta_factors.all:
-      #  min_value: 0.0
-      #  max_value: 1.0
-      #model.policies.interaction_policies.1.beta_factors.all:
-      #  min_value: 0.0
-      #  max_value: 1.0
-      #model.policies.interaction_policies.2.beta_factors.all:
-      #  min_value: 0.0
-      #  max_value: 1.0
+    min_value: -1.0
+    max_value: 2.0
+  model.policies.interaction_policies.0.beta_factors.all:
+    min_value: 0.0
+    max_value: 1.0
+  model.policies.interaction_policies.1.beta_factors.all:
+    min_value: 0.0
+    max_value: 1.0
+  model.policies.interaction_policies.2.beta_factors.all:
+    min_value: 0.0
+    max_value: 1.0
   log_fraction_initial_cases:
     min_value: -4.0
     max_value: -2.5
 
 timer:
-  total_days: 69 # to 2020-07-04
+  total_days: 48 # to 2020-07-04
   initial_day: '2020-03-01'
   step_duration:
     weekday:
@@ -85,6 +79,7 @@ timer:
       - gym
       - cinema
       - visit 
+      - care_visit
       - care_home
       - household
     weekend:
@@ -94,6 +89,7 @@ timer:
       - gym
       - cinema
       - visit 
+      - care_visit
       - care_home
       - household
 
@@ -114,6 +110,8 @@ networks:
   grocery:
     log_beta: 0.0
   visit:
+    log_beta: 0.0
+  care_visit:
     log_beta: 0.0
   cinema:
     log_beta: 0.0
@@ -465,7 +463,7 @@ leisure:
         66-86: 0.1145
         86-100: 0.075
 
-  care_visits:
+  care_visit:
     weekday:
       male:
         0-65: 0.0

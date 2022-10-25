@@ -607,7 +607,7 @@ def runner(params, devices, verbose):
         #    num_epochs *= 2
         # else:
         #    lr = 1e-4 if params["model_name"].startswith("GradABM") else 1e-4
-        lr = 3e-4
+        lr = 1e-4
 
         """ step 1: training  """
         if train_flag:
@@ -617,10 +617,13 @@ def runner(params, devices, verbose):
                 lr=lr,
                 weight_decay=0.01,
             )
-            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-                opt, T_max=NUM_EPOCHS_DIFF
+            # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            #    opt, T_max=NUM_EPOCHS_DIFF
+            # )
+            scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                opt, milestones=[250, 500], gamma=0.5
             )
-            loss_fcn = torch.nn.MSELoss(reduction="mean")
+            loss_fcn = torch.nn.L1Loss(reduction="mean")
             best_loss = np.inf
             losses = []
             df = pd.DataFrame(columns=["loss"])
@@ -671,7 +674,7 @@ def runner(params, devices, verbose):
                         print(torch.cat((y, predictions), 2))
                     # normalize
                     predictions_deaths = predictions_deaths  # / (y_deaths.sum(0)[-1])
-                    y_deaths = y_deaths # / (y_deaths.sum(0)[-1])
+                    y_deaths = y_deaths  # / (y_deaths.sum(0)[-1])
                     # print(predictions_deaths)
                     # print(y_deaths)
                     predictions_seroprev = predictions_seroprev
@@ -684,10 +687,10 @@ def runner(params, devices, verbose):
                     # print(predictions_seroprev)
                     loss = loss_fcn(y_deaths, predictions_deaths)
                     print(loss)
-                    print(y_seroprev[0,:])
+                    print(y_seroprev[0, :])
                     print(predictions_seroprev)
                     loss_seroprev = 1000 * loss_fcn(
-                        y_seroprev[0, :], predictions_seroprev
+                            y_seroprev[0, 1:], predictions_seroprev[1:]
                     )
                     print(loss_seroprev)
                     #loss += loss_seroprev
@@ -844,10 +847,10 @@ def train_predict(args):
         print(f"state {args.state} week {args.pred_week}")
     else:
         print(f"county {args.county_id} week {args.pred_week}")
-    print("Seed used for python random, numpy and torch is {}".format(args.seed))
-    random.seed(args.seed)
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
+    # print("Seed used for python random, numpy and torch is {}".format(args.seed))
+    # random.seed(args.seed)
+    # np.random.seed(args.seed)
+    # torch.manual_seed(args.seed)
 
     params = {}
     params["seed"] = args.seed
