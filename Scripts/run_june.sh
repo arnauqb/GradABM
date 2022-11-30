@@ -3,7 +3,8 @@ set -e
 declare -a weeks=('202014')
 declare -a params=()
 
-for w in "${weeks[@]}"
-do
-    python -u main.py -d 5 -ew "$w" --seed 15234 -m june -di COVID -id 2020-03-16 -nw 7
+END=10
+for ((i=1;i<=END;i++)); do
+    echo $i
+    python -u main.py -d cpu -ew 202014 --seed 15234 -m june -di COVID -id 2020-03-16 -nw 8
 done 

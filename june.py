@@ -1,7 +1,9 @@
 from dis import dis
 from tkinter import W
+import os
 import torch
 import pickle
+from pathlib import Path
 import numpy as np
 import yaml
 import pandas as pd
@@ -61,6 +63,17 @@ class June:
             june_params = yaml.safe_load(f)
             self.parameters_to_calibrate = june_params["parameters_to_calibrate"]
         self.param_values_df = pd.DataFrame(columns=self.parameters_to_calibrate.keys())
+        save_path = Path(os.path.abspath(__file__)).parent / "Data/June/london_fits/losses"
+        i = 0
+        while True:
+            params_save_file = f"params_{i:03d}.csv"
+            params_save_file_path = save_path / params_save_file
+            if params_save_file_path.exists():
+                i += 1
+                continue
+            break
+        self.params_save_file_path = params_save_file_path
+        self.param_values_df.to_csv(params_save_file_path)
 
     @property
     def device(self):
@@ -109,7 +122,8 @@ class June:
         self.param_values_df.loc[len(self.param_values_df)] = (
             param_values.flatten().detach().cpu().numpy()
         )
-        self.param_values_df.to_csv("./param_values.csv", index=False)
+        #self.param_values_df.to_csv("./param_values.csv", index=False)
+        self.param_values_df.to_csv(self.params_save_file_path, index=False)
 
     def _get_seroprevalence(self, results):
         ret = torch.zeros(8, device=results["cases_per_timestep"].device)

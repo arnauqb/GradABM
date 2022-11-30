@@ -3,6 +3,7 @@ from re import X
 import numpy as np
 import torch
 import os
+import yaml
 import torch.nn as nn
 import math
 import time
@@ -621,12 +622,22 @@ def runner(params, devices, verbose):
             #    opt, T_max=NUM_EPOCHS_DIFF
             # )
             scheduler = torch.optim.lr_scheduler.MultiStepLR(
-                opt, milestones=[250, 500], gamma=0.5
+                opt, milestones=[50, 500], gamma=0.5
             )
-            loss_fcn = torch.nn.L1Loss(reduction="mean")
+            loss_fcn = torch.nn.MSELoss(reduction="mean")
             best_loss = np.inf
             losses = []
+            save_path = Path(os.path.abspath(__file__)).parent / "Data/June/london_fits/losses"
+            i = 0
+            while True:
+                losses_save_file = f"losses_{i:03d}.csv"
+                losses_save_file_path = save_path / losses_save_file
+                if losses_save_file_path.exists():
+                    i += 1
+                    continue
+                break
             df = pd.DataFrame(columns=["loss"])
+            df.to_csv(losses_save_file_path)
             for epi in range(num_epochs):
                 print(epi)
                 start = time.time()
@@ -703,31 +714,36 @@ def runner(params, devices, verbose):
                 scheduler.step()
                 losses.append(epoch_loss / (batch + 1))  # divide by number of batches
                 df.loc[epi, "loss"] = epoch_loss / (batch + 1)
+
                 if verbose:
                     print("epoch_loss", epoch_loss)
 
                 if torch.isnan(loss):
                     break
                 """ save best model """
-                df.to_csv("./losses.csv", index=False)
-                if epoch_loss < best_loss:
-                    if params["joint"]:
-                        save_model(
-                            param_model,
-                            file_name,
-                            params["disease"],
-                            "joint",
-                            params["pred_week"],
-                        )
-                    else:
-                        save_model(
-                            param_model,
-                            file_name,
-                            params["disease"],
-                            params["county_id"],
-                            params["pred_week"],
-                        )
-                    best_loss = epoch_loss
+                df.to_csv(losses_save_file_path, index=False)
+                print((epoch_loss / (batch + 1)))
+                if (epoch_loss / (batch + 1)) < 20:
+                    save_parameters(abm)
+                    break
+                #if epoch_loss < best_loss:
+                #    if params["joint"]:
+                #        save_model(
+                #            param_model,
+                #            file_name,
+                #            params["disease"],
+                #            "joint",
+                #            params["pred_week"],
+                #        )
+                #    else:
+                #        save_model(
+                #            param_model,
+                #            file_name,
+                #            params["disease"],
+                #            params["county_id"],
+                #            params["pred_week"],
+                #        )
+                #    best_loss = epoch_loss
 
                 print("epoch {} time (s): {:.2f}".format(epi, time.time() - start))
 
@@ -884,3 +900,38 @@ def train_predict(args):
     counties_predicted, predictions, learned_params = runner(params, devices, verbose)
 
     return counties_predicted, predictions, learned_params
+
+def save_parameters(abm):
+    save_path = Path(os.path.abspath(__file__)).parent / "Data/June/london_fits"
+    # find place to save.
+    i = 0
+    while True:
+        save_file = f"london_fit_{i:03d}.yaml"
+        save_file_path = save_path / save_file
+        if save_file_path.exists():
+            i += 1
+            continue
+        break
+
+    # save best config
+    base_config = yaml.safe_load(open(save_path.parent / "june_default.yaml"))
+    best_params = abm.param_values_df.loc[len(abm.param_values_df)-1]
+    for name, param in best_params.iteritems():
+        if "networks" in name:
+            network = name.split(".")[-2]
+            if network == "leisure":
+                for leisure_name in ["pub", "grocery", "gym", "cinema", "visit"]:
+                    base_config["networks"][leisure_name]["log_beta"] = param
+            else:
+                base_config["networks"][network]["log_beta"] = param
+        if name == "log_fraction_initial_cases":
+            base_config["infection_seed"]["log_fraction_initial_cases"] = param
+        if "interaction_policies" in name:
+            number = int(name.split(".")[-3])
+            base_config["policies"]["interaction"]["social_distancing"][number+1]["beta_factors"]["all"] = param
+    base_config["system"]["device"] = "cuda:6"
+    yaml.dump(base_config, open(save_file_path, "w"))
+    return
+
+
+
